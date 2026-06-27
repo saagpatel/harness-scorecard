@@ -44,10 +44,11 @@ Exit codes: `0` healthy (A/B) · `1` needs attention (C/D/F) · `2` invalid inpu
 
 ## Scope (v1)
 
-Implements the **critical gated trio** end-to-end: **D1** (secret protection), **D4**
-(destructive-action & git safety), and **D5** (harness self-protection & integrity). D2–D3
-and D6–D10 are fully specified and land incrementally. Claude Code first; Codex second. The
-rubric is versioned and emitted in every report.
+Implements **D1–D5** end-to-end: secret protection, egress/exfiltration control,
+tool-surface & inbound-injection defense, destructive-action & git safety, and harness
+self-protection & integrity (the critical gated trio is D1/D4/D5). D6–D10 are fully specified
+and land incrementally. Claude Code first; Codex second. The rubric is versioned and emitted
+in every report.
 
 ## Development
 

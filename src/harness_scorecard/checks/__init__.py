@@ -2,12 +2,20 @@
 
 from __future__ import annotations
 
-from harness_scorecard.checks import destructive_git, secret_protection, self_protection
+from harness_scorecard.checks import (
+    destructive_git,
+    egress,
+    secret_protection,
+    self_protection,
+    tool_surface,
+)
 from harness_scorecard.checks.base import DIMENSIONS, Check, Dimension
 
 # Order = dimension order in the rubric. New dimension modules append here as they land.
 ALL_CHECKS: list[Check] = [
     *secret_protection.CHECKS,
+    *egress.CHECKS,
+    *tool_surface.CHECKS,
     *destructive_git.CHECKS,
     *self_protection.CHECKS,
 ]

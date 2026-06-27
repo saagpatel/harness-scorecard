@@ -3,10 +3,9 @@
 import unittest
 from pathlib import Path
 
-from harness_scorecard.discovery import HookEntry, load_harness
+from harness_scorecard.discovery import load_harness
 from harness_scorecard.models import Grade, grade_from_score
 from harness_scorecard.scoring import score_harness
-from tests.test_checks import make_config
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -22,7 +21,7 @@ class TestStrongHarnessGrade(unittest.TestCase):
         self.assertEqual(self.card.gate_caps, [])
 
     def test_reports_implemented_dimensions(self):
-        self.assertEqual({d.id for d in self.card.dimensions}, {"D1", "D4", "D5"})
+        self.assertEqual({d.id for d in self.card.dimensions}, {"D1", "D2", "D3", "D4", "D5"})
 
     def test_overall_score_is_perfect(self):
         self.assertAlmostEqual(self.card.overall_score, 1.0)
@@ -43,17 +42,18 @@ class TestWeakHarnessGrade(unittest.TestCase):
 class TestGateCapping(unittest.TestCase):
     """A harness that scores well on weighting but fails a gate is capped down."""
 
+    # Core credential-path needles whose removal makes HS-D1-01 (the secret gate) fail while
+    # leaving every other check satisfied (token-store, wallet, MCP denies all stay).
+    _SECRET_NEEDLES = (".ssh", ".aws", ".gnupg", "/op/", "gcloud", ".env")
+
     def setUp(self):
-        # Strong D4 and D5 (effective hooks, non-bypass) but NO secret denies, so only the
-        # D1-01 secret gate fails -> it alone caps the otherwise-high weighted grade.
-        self.card = score_harness(
-            make_config(
-                default_mode="acceptEdits",
-                deny=[],
-                env={"DISABLE_TELEMETRY": "1", "DISABLE_ERROR_REPORTING": "1"},
-                hooks=_strong_d4_hooks() + _partial_d1_hooks() + _strong_d5_hooks(),
-            )
-        )
+        # Start from the canonical A harness and strip ONLY the core secret-path denies, so
+        # HS-D1-01 is the single failing check -> it alone caps an otherwise-high grade.
+        config = load_harness(FIXTURES / "strong_harness")
+        config.deny = [
+            entry for entry in config.deny if not any(s in entry for s in self._SECRET_NEEDLES)
+        ]
+        self.card = score_harness(config)
 
     def test_uncapped_band_would_be_higher_than_final(self):
         uncapped = grade_from_score(self.card.overall_score)
@@ -64,29 +64,6 @@ class TestGateCapping(unittest.TestCase):
 
     def test_d1_gate_is_the_cause(self):
         self.assertEqual({r.id for r in self.card.gate_caps}, {"HS-D1-01"})
-
-
-def _strong_d4_hooks():
-    names = ["git-safety", "block-dangerous-cmds", "db-guard", "confirm-token"]
-    return [HookEntry("PreToolUse", "Bash", f"/h/{name}.sh") for name in names]
-
-
-def _partial_d1_hooks():
-    return [
-        HookEntry("PreToolUse", "Bash", "/h/protect-sensitive-reads.sh"),
-        HookEntry("PreToolUse", "Edit|Write", "/h/detect-secrets.sh"),
-    ]
-
-
-def _strong_d5_hooks():
-    return [
-        HookEntry("PreToolUse", "Bash", "/h/protect-claude-writes.sh"),
-        HookEntry("PreToolUse", "Read|Edit|Write", "/h/protect-files.sh"),
-        HookEntry("SessionStart", "", "/h/hook-integrity-verify.sh"),
-        HookEntry("SessionStart", "", "/h/harness-self-heal.sh"),
-        HookEntry("PreToolUse", "Edit|Write", "/h/harness-config-snapshot.sh"),
-        HookEntry("PostToolUse", "Edit|Write", "/h/harness-config-validate.sh"),
-    ]
 
 
 if __name__ == "__main__":

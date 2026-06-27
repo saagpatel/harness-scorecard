@@ -8,6 +8,7 @@ bad file can't blank the whole grade.
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -87,6 +88,42 @@ class HarnessConfig:
         if registered in ("", "*"):
             return True
         return wanted.lower() in registered.lower()
+
+    @staticmethod
+    def _matcher_matches_tool(matcher: str, tool_name: str) -> bool:
+        """Whether a single matcher (a regex, per Claude Code) matches a concrete tool name.
+
+        ``mcp__.*`` covers the whole MCP lane while ``mcp__search_files`` covers only that one
+        tool. A universal matcher (empty / ``*``) matches everything; an invalid regex falls
+        back to a substring test.
+        """
+        matcher = matcher.strip()
+        if matcher in ("", "*"):
+            return True
+        try:
+            return re.search(matcher, tool_name) is not None
+        except re.error:
+            return matcher.lower() in tool_name.lower()
+
+    def matches_tool(self, event: str, tool_name: str) -> bool:
+        """True if any hook under ``event`` has a matcher that matches ``tool_name``."""
+        return any(
+            hook.event == event and self._matcher_matches_tool(hook.matcher, tool_name)
+            for hook in self.hooks
+        )
+
+    def has_hook_on_tool(self, event: str, command_contains: str, tool_name: str) -> bool:
+        """True if a hook under ``event`` whose command matches also covers ``tool_name``.
+
+        Like :meth:`has_hook`, but the matcher is required to cover the given tool's lane
+        (regex match), so a sentinel registered on the wrong lane is not credited.
+        """
+        return any(
+            hook.event == event
+            and command_contains in hook.command
+            and self._matcher_matches_tool(hook.matcher, tool_name)
+            for hook in self.hooks
+        )
 
     def env_flag_enabled(self, key: str) -> bool:
         """True when an env var is set to a truthy value (``1``/``true``)."""

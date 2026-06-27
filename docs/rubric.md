@@ -121,15 +121,15 @@ Final grade = `min(band(overall_score), lowest_triggered_gate_cap)`.
 ## 5. Dimensions
 
 Ten dimensions, each weighted. Dimensions D1, D4, D5 are **critical** (weight 5) and carry
-gates. The critical trio D1, D4, D5 is *implemented* end-to-end; D2–D3 and D6–D10 are fully
-specified here and land incrementally. Specification is complete; implementation is phased,
-no dimension is silently dropped.
+gates. D1 through D5 are *implemented* end-to-end; D6–D10 are fully specified here and land
+incrementally. Specification is complete; implementation is phased, no dimension is silently
+dropped.
 
 | Dim | Name | Weight | Gate? | v1 status |
 |---|---|---|---|---|
 | D1 | Secret protection & credential isolation | 5 | ✅ | **implemented** |
-| D2 | Egress / exfiltration control | 4 | — | specced |
-| D3 | Tool-surface & inbound-injection defense | 4 | — | specced |
+| D2 | Egress / exfiltration control | 4 | — | **implemented** |
+| D3 | Tool-surface & inbound-injection defense | 4 | — | **implemented** |
 | D4 | Destructive-action & git safety | 5 | ✅ | **implemented** |
 | D5 | Harness self-protection & integrity | 5 | ✅ | **implemented** |
 | D6 | Verification gates | 3 | — | specced |
@@ -186,7 +186,7 @@ harness shows in config. *Failure mode* = the documented incident it guards agai
   Signal: a `git-safety` hook covering `--force`/`--no-verify`; PARTIAL because policy
   documented only in `rules/*.md` is advisory. Failure mode: force-push drops origin-ahead commits.
 
-### D2 — Egress / exfiltration control (weight 4) — *specced*
+### D2 — Egress / exfiltration control (weight 4)
 
 - **HS-D2-01 — Network-egress guard on Bash (4, STATIC)**: PreToolUse hook inspecting
   `curl`/`wget` for exfil; `wget` denied. FM: `curl --data @secret` to attacker host.
@@ -195,7 +195,7 @@ harness shows in config. *Failure mode* = the documented incident it guards agai
 - **HS-D2-03 — MCP output cap set (2, STATIC)**: `env.MAX_MCP_OUTPUT_TOKENS` bounded. FM:
   oversized MCP payload floods context / exfil channel.
 
-### D3 — Tool-surface & inbound-injection defense (weight 4) — *specced*
+### D3 — Tool-surface & inbound-injection defense (weight 4)
 
 - **HS-D3-01 — MCP lane is gated (5, STATIC)**: a PreToolUse matcher covers `mcp__.*`
   (not Bash-only). FM: MCP calls bypassing the whole guard stack.

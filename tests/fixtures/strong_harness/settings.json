@@ -65,6 +65,10 @@
 					{ "type": "command", "command": "${DIR}/hooks/bash-egress-guard.sh" },
 					{
 						"type": "command",
+						"command": "${DIR}/hooks/remote-command-guard.sh"
+					},
+					{
+						"type": "command",
 						"command": "${DIR}/hooks/protect-claude-writes.sh"
 					}
 				]
@@ -84,6 +88,10 @@
 				"hooks": [
 					{ "type": "command", "command": "${DIR}/hooks/protect-files.sh" }
 				]
+			},
+			{
+				"matcher": "mcp__.*",
+				"hooks": [{ "type": "command", "command": "${DIR}/hooks/mcp-guard.sh" }]
 			}
 		],
 		"PostToolUse": [
@@ -91,6 +99,18 @@
 				"matcher": "mcp__.*",
 				"hooks": [
 					{ "type": "command", "command": "${DIR}/hooks/content-sentinel.sh" }
+				]
+			},
+			{
+				"matcher": "WebFetch|WebSearch",
+				"hooks": [
+					{ "type": "command", "command": "${DIR}/hooks/webfetch-sentinel.sh" }
+				]
+			},
+			{
+				"matcher": "Read|Grep",
+				"hooks": [
+					{ "type": "command", "command": "${DIR}/hooks/read-grep-sentinel.sh" }
 				]
 			},
 			{
