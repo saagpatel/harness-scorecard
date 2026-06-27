@@ -121,9 +121,7 @@ Final grade = `min(band(overall_score), lowest_triggered_gate_cap)`.
 ## 5. Dimensions
 
 Ten dimensions, each weighted. Dimensions D1, D4, D5 are **critical** (weight 5) and carry
-gates. D1 through D5 are *implemented* end-to-end; D6–D10 are fully specified here and land
-incrementally. Specification is complete; implementation is phased, no dimension is silently
-dropped.
+gates. All ten dimensions are *implemented* end-to-end against this rubric.
 
 | Dim | Name | Weight | Gate? | v1 status |
 |---|---|---|---|---|
@@ -132,11 +130,11 @@ dropped.
 | D3 | Tool-surface & inbound-injection defense | 4 | — | **implemented** |
 | D4 | Destructive-action & git safety | 5 | ✅ | **implemented** |
 | D5 | Harness self-protection & integrity | 5 | ✅ | **implemented** |
-| D6 | Verification gates | 3 | — | specced |
-| D7 | Subagent isolation & governance | 3 | — | specced |
-| D8 | Recovery / rollback safety | 2 | — | specced |
-| D9 | Memory / provenance hygiene | 2 | — | specced |
-| D10 | Observability / audit trail | 2 | — | specced |
+| D6 | Verification gates | 3 | — | **implemented** |
+| D7 | Subagent isolation & governance | 3 | — | **implemented** |
+| D8 | Recovery / rollback safety | 2 | — | **implemented** |
+| D9 | Memory / provenance hygiene | 2 | — | **implemented** |
+| D10 | Observability / audit trail | 2 | — | **implemented** |
 
 Each check below: `ID — title (weight, detectability) [GATE]`. *Signal* = what a strong
 harness shows in config. *Failure mode* = the documented incident it guards against.
@@ -216,14 +214,14 @@ harness shows in config. *Failure mode* = the documented incident it guards agai
   post-edit validation of `settings.json`. FM: settings.json silently truncates to a
   bypass-accept stub with no backup.
 
-### D6 — Verification gates (weight 3) — *specced*
+### D6 — Verification gates (weight 3)
 
 - **HS-D6-01 — Task-completion verification hook (4, STATIC)**: a `TaskCompleted` hook that
   runs compile/tests. FM: "done" claimed with no evidence.
 - **HS-D6-02 — Stop / SubagentStop quality gate (3, STATIC)**: `Stop` gate and a
   `SubagentStop` reviewer. FM: subagent returns plausible-but-wrong output, trusted blindly.
 
-### D7 — Subagent isolation & governance (weight 3) — *specced*
+### D7 — Subagent isolation & governance (weight 3)
 
 - **HS-D7-01 — Guards are global (subagents inherit) (4, STATIC)**: hook matchers include
   `Agent`/`Bash`/`mcp__.*` at the top level (not per-agent). FM: subagent escapes the floor.
@@ -232,7 +230,7 @@ harness shows in config. *Failure mode* = the documented incident it guards agai
 - **HS-D7-03 — Subagent scope linter / reviewer (3, STATIC)**: PreToolUse `Agent` scope
   linter + SubagentStop reviewer. FM: builder subagent edits beyond its declared slice.
 
-### D8 — Recovery / rollback safety (weight 2) — *specced*
+### D8 — Recovery / rollback safety (weight 2)
 
 - **HS-D8-01 — Pre-compaction backup (3, STATIC)**: a `PreCompact` backup hook. FM: context
   compaction loses un-snapshotted state.
@@ -240,14 +238,14 @@ harness shows in config. *Failure mode* = the documented incident it guards agai
   confirmation rather than executed inline; worktree isolation configured. FM: irreversible
   action taken without a recovery path.
 
-### D9 — Memory / provenance hygiene (weight 2) — *specced*
+### D9 — Memory / provenance hygiene (weight 2)
 
 - **HS-D9-01 — Skill-install provenance gate (3, STATIC)**: PreToolUse Write/Edit
   skill-install guard + a provenance rule. FM: a skill pack silently clobbers a user skill.
 - **HS-D9-02 — Skill-catalog injection bounds (2, STATIC)**: `skillListingBudgetFraction`
   and `maxSkillDescriptionChars` set. FM: re-injecting the full skill catalog blows context.
 
-### D10 — Observability / audit trail (weight 2) — *specced*
+### D10 — Observability / audit trail (weight 2)
 
 - **HS-D10-01 — Tool-call audit logging (3, STATIC)**: PostToolUse audit logs for `Bash`
   and `mcp__.*`. FM: can't reconstruct what an agent/injection did.

@@ -5,9 +5,14 @@ from __future__ import annotations
 from harness_scorecard.checks import (
     destructive_git,
     egress,
+    observability,
+    provenance,
+    recovery,
     secret_protection,
     self_protection,
+    subagent_isolation,
     tool_surface,
+    verification,
 )
 from harness_scorecard.checks.base import DIMENSIONS, Check, Dimension
 
@@ -18,6 +23,11 @@ ALL_CHECKS: list[Check] = [
     *tool_surface.CHECKS,
     *destructive_git.CHECKS,
     *self_protection.CHECKS,
+    *verification.CHECKS,
+    *subagent_isolation.CHECKS,
+    *recovery.CHECKS,
+    *provenance.CHECKS,
+    *observability.CHECKS,
 ]
 
 # Dimensions that actually have checks this version (used to report coverage honestly).

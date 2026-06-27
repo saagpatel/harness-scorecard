@@ -129,6 +129,14 @@ class HarnessConfig:
         """True when an env var is set to a truthy value (``1``/``true``)."""
         return str(self.env.get(key, "")).strip().lower() in ("1", "true", "yes")
 
+    def has_setting(self, key: str) -> bool:
+        """True when a top-level settings key is present with a non-null value."""
+        return self.raw_settings.get(key) is not None
+
+    def has_event(self, event: str) -> bool:
+        """True when at least one hook is registered under ``event`` (any matcher)."""
+        return any(hook.event == event for hook in self.hooks)
+
 
 def _read_json(path: Path) -> dict[str, Any]:
     try:

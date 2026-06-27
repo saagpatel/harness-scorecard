@@ -31,6 +31,9 @@
 			"rm -rf at depth <= 1 from $HOME"
 		]
 	},
+	"worktree": { "enabled": true },
+	"skillListingBudgetFraction": 0.035,
+	"maxSkillDescriptionChars": 512,
 	"hooks": {
 		"SessionStart": [
 			{
@@ -40,7 +43,8 @@
 						"command": "${DIR}/hooks/hook-integrity-verify.sh"
 					},
 					{ "type": "command", "command": "${DIR}/hooks/harness-self-heal.sh" },
-					{ "type": "command", "command": "${DIR}/hooks/settings-guard.sh" }
+					{ "type": "command", "command": "${DIR}/hooks/settings-guard.sh" },
+					{ "type": "command", "command": "${DIR}/hooks/worktree-init.sh" }
 				]
 			}
 		],
@@ -67,6 +71,7 @@
 						"type": "command",
 						"command": "${DIR}/hooks/remote-command-guard.sh"
 					},
+					{ "type": "command", "command": "${DIR}/hooks/defer-destructive.sh" },
 					{
 						"type": "command",
 						"command": "${DIR}/hooks/protect-claude-writes.sh"
@@ -80,7 +85,8 @@
 					{
 						"type": "command",
 						"command": "${DIR}/hooks/harness-config-snapshot.sh"
-					}
+					},
+					{ "type": "command", "command": "${DIR}/hooks/skill-install-gate.sh" }
 				]
 			},
 			{
@@ -92,13 +98,23 @@
 			{
 				"matcher": "mcp__.*",
 				"hooks": [{ "type": "command", "command": "${DIR}/hooks/mcp-guard.sh" }]
+			},
+			{
+				"matcher": "Agent",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "${DIR}/hooks/subagent-scope-linter.sh"
+					}
+				]
 			}
 		],
 		"PostToolUse": [
 			{
 				"matcher": "mcp__.*",
 				"hooks": [
-					{ "type": "command", "command": "${DIR}/hooks/content-sentinel.sh" }
+					{ "type": "command", "command": "${DIR}/hooks/content-sentinel.sh" },
+					{ "type": "command", "command": "${DIR}/hooks/mcp-audit-log.sh" }
 				]
 			},
 			{
@@ -114,11 +130,39 @@
 				]
 			},
 			{
+				"matcher": "Bash",
+				"hooks": [
+					{ "type": "command", "command": "${DIR}/hooks/bash-audit-log.sh" }
+				]
+			},
+			{
 				"matcher": "Edit|Write",
 				"hooks": [
 					{
 						"type": "command",
 						"command": "${DIR}/hooks/harness-config-validate.sh"
+					}
+				]
+			}
+		],
+		"PreCompact": [
+			{
+				"hooks": [
+					{ "type": "command", "command": "${DIR}/hooks/precompact-backup.sh" }
+				]
+			}
+		],
+		"Stop": [
+			{
+				"hooks": [{ "type": "command", "command": "${DIR}/hooks/stop-gate.sh" }]
+			}
+		],
+		"SubagentStop": [
+			{
+				"hooks": [
+					{
+						"type": "command",
+						"command": "${DIR}/hooks/subagent-quality-gate.sh"
 					}
 				]
 			}
@@ -130,6 +174,23 @@
 						"type": "command",
 						"command": "${DIR}/hooks/task-completed-verify.sh"
 					}
+				]
+			}
+		],
+		"PermissionDenied": [
+			{
+				"hooks": [
+					{
+						"type": "command",
+						"command": "${DIR}/hooks/permission-denied-log.sh"
+					}
+				]
+			}
+		],
+		"PostToolUseFailure": [
+			{
+				"hooks": [
+					{ "type": "command", "command": "${DIR}/hooks/tool-failure-log.sh" }
 				]
 			}
 		]

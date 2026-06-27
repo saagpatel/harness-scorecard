@@ -44,11 +44,12 @@ Exit codes: `0` healthy (A/B) · `1` needs attention (C/D/F) · `2` invalid inpu
 
 ## Scope (v1)
 
-Implements **D1–D5** end-to-end: secret protection, egress/exfiltration control,
-tool-surface & inbound-injection defense, destructive-action & git safety, and harness
-self-protection & integrity (the critical gated trio is D1/D4/D5). D6–D10 are fully specified
-and land incrementally. Claude Code first; Codex second. The rubric is versioned and emitted
-in every report.
+Implements **all ten rubric dimensions** end-to-end for Claude Code harnesses: secret
+protection, egress/exfiltration control, tool-surface & inbound-injection defense,
+destructive-action & git safety, harness self-protection & integrity, verification gates,
+subagent isolation & governance, recovery/rollback safety, memory/provenance hygiene, and
+observability/audit trail (the critical gated trio is D1/D4/D5). Codex support is next. The
+rubric is versioned and emitted in every report.
 
 ## Development
 

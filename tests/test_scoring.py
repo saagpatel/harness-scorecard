@@ -21,7 +21,10 @@ class TestStrongHarnessGrade(unittest.TestCase):
         self.assertEqual(self.card.gate_caps, [])
 
     def test_reports_implemented_dimensions(self):
-        self.assertEqual({d.id for d in self.card.dimensions}, {"D1", "D2", "D3", "D4", "D5"})
+        self.assertEqual(
+            {d.id for d in self.card.dimensions},
+            {"D1", "D2", "D3", "D4", "D5", "D6", "D7", "D8", "D9", "D10"},
+        )
 
     def test_overall_score_is_perfect(self):
         self.assertAlmostEqual(self.card.overall_score, 1.0)
