@@ -1,0 +1,18 @@
+{
+	"permissions": {
+		"defaultMode": "bypassPermissions",
+		"deny": [],
+		"allow": ["Read", "Glob", "Grep", "Bash"]
+	},
+	"env": {},
+	"autoMode": {
+		"hard_deny": [
+			"Read or transmit ~/.ssh, ~/.aws, ~/.gnupg",
+			"Push to main or master",
+			"Destructive DB operations on non-localhost hosts",
+			"Mutate the harness config directory",
+			"rm -rf at depth <= 1 from $HOME"
+		]
+	},
+	"hooks": {}
+}

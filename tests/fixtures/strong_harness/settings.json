@@ -1,0 +1,82 @@
+{
+	"permissions": {
+		"defaultMode": "acceptEdits",
+		"deny": [
+			"Read(~/.ssh/**)",
+			"Read(~/.aws/**)",
+			"Read(~/.gnupg/**)",
+			"Read(~/.config/op/**)",
+			"Read(~/.config/gcloud/**)",
+			"Read(**/.env*)",
+			"Read(~/.harness/.tokens/**)",
+			"Read(~/Library/Application Support/**/metamask*/**)",
+			"Bash(wget *)",
+			"Bash(rm -rf /*)",
+			"ListMcpResourcesTool(*)",
+			"ReadMcpResourceTool(*)"
+		],
+		"allow": ["Read", "Glob", "Grep", "Bash(git status)", "Bash(npm ci)"]
+	},
+	"env": {
+		"DISABLE_TELEMETRY": "1",
+		"DISABLE_ERROR_REPORTING": "1",
+		"MAX_MCP_OUTPUT_TOKENS": "50000"
+	},
+	"autoMode": {
+		"hard_deny": [
+			"Read or transmit ~/.ssh, ~/.aws, ~/.gnupg",
+			"Push to main or master",
+			"Destructive DB operations on non-localhost hosts",
+			"Mutate the harness config directory",
+			"rm -rf at depth <= 1 from $HOME"
+		]
+	},
+	"hooks": {
+		"PreToolUse": [
+			{
+				"matcher": "Bash",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "${DIR}/hooks/block-dangerous-cmds.sh"
+					},
+					{ "type": "command", "command": "${DIR}/hooks/git-safety.sh" },
+					{ "type": "command", "command": "${DIR}/hooks/db-guard.sh" },
+					{
+						"type": "command",
+						"command": "${DIR}/hooks/protect-sensitive-reads.sh"
+					},
+					{
+						"type": "command",
+						"command": "${DIR}/hooks/confirm-token-required.sh"
+					},
+					{ "type": "command", "command": "${DIR}/hooks/bash-egress-guard.sh" }
+				]
+			},
+			{
+				"matcher": "Edit|Write",
+				"hooks": [
+					{ "type": "command", "command": "${DIR}/hooks/detect-secrets.sh" }
+				]
+			}
+		],
+		"PostToolUse": [
+			{
+				"matcher": "mcp__.*",
+				"hooks": [
+					{ "type": "command", "command": "${DIR}/hooks/content-sentinel.sh" }
+				]
+			}
+		],
+		"TaskCompleted": [
+			{
+				"hooks": [
+					{
+						"type": "command",
+						"command": "${DIR}/hooks/task-completed-verify.sh"
+					}
+				]
+			}
+		]
+	}
+}

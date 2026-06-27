@@ -1,0 +1,68 @@
+[project]
+name = "harness-scorecard"
+version = "0.1.0"
+description = "A read-only linter and A-F maturity grader for coding-agent harnesses (Claude Code, Codex)."
+readme = "README.md"
+authors = [{ name = "Harness Scorecard maintainers" }]
+requires-python = ">=3.12"
+# Runtime is intentionally dependency-free: stdlib only.
+# A scorer that grades supply-chain hygiene should carry the smallest
+# possible dependency surface itself. Dev tooling lives in [dependency-groups].
+dependencies = []
+
+[project.scripts]
+harness-scorecard = "harness_scorecard.cli:main"
+
+[build-system]
+requires = ["uv_build>=0.11.13,<0.12.0"]
+build-backend = "uv_build"
+
+# Dev tooling is declared here but installed via an approval-gated `uv add`.
+# Tests run on the stdlib (`unittest`) until pytest is approved; the suite is
+# written as unittest.TestCase classes so pytest discovers it unchanged.
+[dependency-groups]
+dev = [{ include-group = "lint" }, { include-group = "test" }]
+lint = ["ruff", "ty"]
+test = ["pytest", "pytest-cov"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = [
+    "D",            # docstring style — handled case-by-case
+    "COM812",       # trailing comma — conflicts with the formatter
+    "ISC001",       # implicit string concat — conflicts with the formatter
+    "ANN401",       # Any is legitimate at the raw-JSON parsing boundary
+    "PLR0913",      # keyword-only config params (effective_block) read clearly
+    "TC001",        # avoid TYPE_CHECKING-block ceremony in small modules
+    "TC002",
+    "TC003",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests use unittest.TestCase deliberately (stdlib-runnable, zero extra deps).
+"tests/**" = [
+    "S101",         # asserts are the point of tests
+    "PLR2004",      # magic values in assertions are fine
+    "ANN",          # test signatures need no annotations
+    "SLF001",       # tests may touch private members
+    "PT009",        # unittest-style assertEqual is intentional here
+    "PT027",        # unittest-style assertRaises is intentional here
+    "INP001",       # tests/ is intentionally not an importable package
+    "N802",         # setUp / tearDown are the unittest API
+    "S108",         # the scratchpad temp path is intentional
+]
+"src/harness_scorecard/cli.py" = ["T201"]  # print is the CLI's output channel
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = ["--import-mode=importlib"]
+
+[tool.ty.environment]
+python-version = "3.12"
+
+[tool.ty.terminal]
+error-on-warning = true

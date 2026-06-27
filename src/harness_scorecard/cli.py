@@ -1,0 +1,85 @@
+"""Command-line entry point: ``harness-scorecard scan <path>``.
+
+Exit codes mirror a linter contract: 0 = healthy (A/B), 1 = needs attention (C/D/F),
+2 = invalid input (no harness found).
+"""
+
+from __future__ import annotations
+
+import argparse
+import sys
+from pathlib import Path
+
+from harness_scorecard.discovery import load_harness
+from harness_scorecard.htmlreport import render_html
+from harness_scorecard.models import RUBRIC_VERSION, Grade
+from harness_scorecard.report import render_console, render_json
+from harness_scorecard.scoring import score_harness
+
+_HEALTHY_GRADES = (Grade.A, Grade.B)
+
+
+def _build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="harness-scorecard",
+        description="Grade a coding-agent harness configuration against the red-team rubric.",
+    )
+    parser.add_argument(
+        "--version", action="version", version=f"harness-scorecard {RUBRIC_VERSION}"
+    )
+    sub = parser.add_subparsers(dest="command", required=True)
+
+    scan = sub.add_parser("scan", help="Scan and grade a harness directory.")
+    scan.add_argument("path", help="Path to the harness directory (e.g. ~/.claude).")
+    scan.add_argument(
+        "--format",
+        choices=["console", "json"],
+        default="console",
+        help="Output format for stdout (default: console).",
+    )
+    scan.add_argument(
+        "--json",
+        dest="json_out",
+        metavar="FILE",
+        help="Also write a JSON report to FILE.",
+    )
+    scan.add_argument(
+        "--html",
+        dest="html_out",
+        metavar="FILE",
+        help="Also write a self-contained HTML scorecard to FILE.",
+    )
+    return parser
+
+
+def _run_scan(args: argparse.Namespace) -> int:
+    root = Path(args.path).expanduser()
+    try:
+        config = load_harness(root)
+    except FileNotFoundError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+
+    card = score_harness(config)
+    output = render_json(card) if args.format == "json" else render_console(card)
+    print(output)
+
+    if args.json_out:
+        Path(args.json_out).expanduser().write_text(render_json(card), encoding="utf-8")
+    if args.html_out:
+        Path(args.html_out).expanduser().write_text(render_html(card), encoding="utf-8")
+
+    return 0 if card.grade in _HEALTHY_GRADES else 1
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = _build_parser()
+    args = parser.parse_args(argv)
+    if args.command == "scan":
+        return _run_scan(args)
+    parser.print_help()
+    return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
