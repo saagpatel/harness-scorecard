@@ -121,9 +121,9 @@ Final grade = `min(band(overall_score), lowest_triggered_gate_cap)`.
 ## 5. Dimensions
 
 Ten dimensions, each weighted. Dimensions D1, D4, D5 are **critical** (weight 5) and carry
-gates. v1 *implements* D1 and D4 end-to-end; D2–D3 and D5–D10 are fully specified here and
-land incrementally. Specification is complete; implementation is phased — no dimension is
-silently dropped.
+gates. The critical trio D1, D4, D5 is *implemented* end-to-end; D2–D3 and D6–D10 are fully
+specified here and land incrementally. Specification is complete; implementation is phased,
+no dimension is silently dropped.
 
 | Dim | Name | Weight | Gate? | v1 status |
 |---|---|---|---|---|
@@ -131,7 +131,7 @@ silently dropped.
 | D2 | Egress / exfiltration control | 4 | — | specced |
 | D3 | Tool-surface & inbound-injection defense | 4 | — | specced |
 | D4 | Destructive-action & git safety | 5 | ✅ | **implemented** |
-| D5 | Harness self-protection & integrity | 5 | ✅ | specced |
+| D5 | Harness self-protection & integrity | 5 | ✅ | **implemented** |
 | D6 | Verification gates | 3 | — | specced |
 | D7 | Subagent isolation & governance | 3 | — | specced |
 | D8 | Recovery / rollback safety | 2 | — | specced |
@@ -205,7 +205,7 @@ harness shows in config. *Failure mode* = the documented incident it guards agai
 - **HS-D3-03 — PreToolUse matcher breadth (3, STATIC)**: guards match
   `Bash|mcp__.*|Read|Edit|Write`, not Bash alone. FM: narrow matchers leave lanes open.
 
-### D5 — Harness self-protection & integrity (weight 5, GATE) — *specced*
+### D5 — Harness self-protection & integrity (weight 5, GATE)
 
 - **HS-D5-01 — Harness config write-protected (5, STATIC) [GATE→C]**: read-path **and**
   write-path guards both protect the harness's own `hooks/`, `agents/`, `settings*.json`,

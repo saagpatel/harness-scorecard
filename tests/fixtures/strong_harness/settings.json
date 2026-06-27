@@ -32,6 +32,18 @@
 		]
 	},
 	"hooks": {
+		"SessionStart": [
+			{
+				"hooks": [
+					{
+						"type": "command",
+						"command": "${DIR}/hooks/hook-integrity-verify.sh"
+					},
+					{ "type": "command", "command": "${DIR}/hooks/harness-self-heal.sh" },
+					{ "type": "command", "command": "${DIR}/hooks/settings-guard.sh" }
+				]
+			}
+		],
 		"PreToolUse": [
 			{
 				"matcher": "Bash",
@@ -50,13 +62,27 @@
 						"type": "command",
 						"command": "${DIR}/hooks/confirm-token-required.sh"
 					},
-					{ "type": "command", "command": "${DIR}/hooks/bash-egress-guard.sh" }
+					{ "type": "command", "command": "${DIR}/hooks/bash-egress-guard.sh" },
+					{
+						"type": "command",
+						"command": "${DIR}/hooks/protect-claude-writes.sh"
+					}
 				]
 			},
 			{
 				"matcher": "Edit|Write",
 				"hooks": [
-					{ "type": "command", "command": "${DIR}/hooks/detect-secrets.sh" }
+					{ "type": "command", "command": "${DIR}/hooks/detect-secrets.sh" },
+					{
+						"type": "command",
+						"command": "${DIR}/hooks/harness-config-snapshot.sh"
+					}
+				]
+			},
+			{
+				"matcher": "Read|Edit|Write",
+				"hooks": [
+					{ "type": "command", "command": "${DIR}/hooks/protect-files.sh" }
 				]
 			}
 		],
@@ -65,6 +91,15 @@
 				"matcher": "mcp__.*",
 				"hooks": [
 					{ "type": "command", "command": "${DIR}/hooks/content-sentinel.sh" }
+				]
+			},
+			{
+				"matcher": "Edit|Write",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "${DIR}/hooks/harness-config-validate.sh"
+					}
 				]
 			}
 		],

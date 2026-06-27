@@ -39,7 +39,7 @@ class TestScanCommand(unittest.TestCase):
         payload = json.loads(out)
         self.assertEqual(payload["grade"], "A")
         self.assertEqual(payload["dimensions_total"], 10)
-        self.assertEqual(payload["dimensions_scored"], 2)
+        self.assertEqual(payload["dimensions_scored"], 3)
 
 
 if __name__ == "__main__":

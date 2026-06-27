@@ -44,9 +44,10 @@ Exit codes: `0` healthy (A/B) · `1` needs attention (C/D/F) · `2` invalid inpu
 
 ## Scope (v1)
 
-Implements dimensions **D1** (secret protection) and **D4** (destructive-action & git safety)
-end-to-end against the rubric; D2–D3 and D5–D10 are fully specified and land incrementally.
-Claude Code first; Codex second. The rubric is versioned and emitted in every report.
+Implements the **critical gated trio** end-to-end: **D1** (secret protection), **D4**
+(destructive-action & git safety), and **D5** (harness self-protection & integrity). D2–D3
+and D6–D10 are fully specified and land incrementally. Claude Code first; Codex second. The
+rubric is versioned and emitted in every report.
 
 ## Development
 

@@ -21,8 +21,8 @@ class TestStrongHarnessGrade(unittest.TestCase):
     def test_no_gates_tripped(self):
         self.assertEqual(self.card.gate_caps, [])
 
-    def test_reports_both_implemented_dimensions(self):
-        self.assertEqual({d.id for d in self.card.dimensions}, {"D1", "D4"})
+    def test_reports_implemented_dimensions(self):
+        self.assertEqual({d.id for d in self.card.dimensions}, {"D1", "D4", "D5"})
 
     def test_overall_score_is_perfect(self):
         self.assertAlmostEqual(self.card.overall_score, 1.0)
@@ -35,22 +35,23 @@ class TestWeakHarnessGrade(unittest.TestCase):
     def test_scores_an_F(self):
         self.assertEqual(self.card.grade, Grade.F)
 
-    def test_both_gates_trip(self):
+    def test_all_critical_gates_trip(self):
         tripped = {r.id for r in self.card.gate_caps}
-        self.assertEqual(tripped, {"HS-D1-01", "HS-D4-01"})
+        self.assertEqual(tripped, {"HS-D1-01", "HS-D4-01", "HS-D5-01"})
 
 
 class TestGateCapping(unittest.TestCase):
     """A harness that scores well on weighting but fails a gate is capped down."""
 
     def setUp(self):
-        # Strong D4 (effective hooks, non-bypass) but NO secret denies -> D1-01 gate fails.
+        # Strong D4 and D5 (effective hooks, non-bypass) but NO secret denies, so only the
+        # D1-01 secret gate fails -> it alone caps the otherwise-high weighted grade.
         self.card = score_harness(
             make_config(
                 default_mode="acceptEdits",
                 deny=[],
                 env={"DISABLE_TELEMETRY": "1", "DISABLE_ERROR_REPORTING": "1"},
-                hooks=_strong_d4_hooks() + _partial_d1_hooks(),
+                hooks=_strong_d4_hooks() + _partial_d1_hooks() + _strong_d5_hooks(),
             )
         )
 
@@ -74,6 +75,17 @@ def _partial_d1_hooks():
     return [
         HookEntry("PreToolUse", "Bash", "/h/protect-sensitive-reads.sh"),
         HookEntry("PreToolUse", "Edit|Write", "/h/detect-secrets.sh"),
+    ]
+
+
+def _strong_d5_hooks():
+    return [
+        HookEntry("PreToolUse", "Bash", "/h/protect-claude-writes.sh"),
+        HookEntry("PreToolUse", "Read|Edit|Write", "/h/protect-files.sh"),
+        HookEntry("SessionStart", "", "/h/hook-integrity-verify.sh"),
+        HookEntry("SessionStart", "", "/h/harness-self-heal.sh"),
+        HookEntry("PreToolUse", "Edit|Write", "/h/harness-config-snapshot.sh"),
+        HookEntry("PostToolUse", "Edit|Write", "/h/harness-config-validate.sh"),
     ]
 
 
