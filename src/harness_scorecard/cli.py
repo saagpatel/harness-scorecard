@@ -29,6 +29,7 @@ from harness_scorecard.fleet import (
     render_fleet_json,
 )
 from harness_scorecard.htmlreport import render_html
+from harness_scorecard.introspect import detect_evidence
 from harness_scorecard.models import RUBRIC_VERSION, Grade, grade_rank
 from harness_scorecard.policy import EMPTY_POLICY, POLICY_FILENAME, find_policy, load_policy
 from harness_scorecard.redaction import redact_text
@@ -124,6 +125,14 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Policy file (waivers + dispatcher manifest). Default: auto-discover "
         f"{POLICY_FILENAME} in the harness directory.",
     )
+    scan.add_argument(
+        "--credit-detected",
+        dest="credit_detected",
+        action="store_true",
+        help="Credit checks whose guard is auto-detected in an opaque dispatcher's source "
+        "(by default such evidence only surfaces as a suggestion). Lower-trust than a "
+        "hand-verified [dispatcher].credits entry.",
+    )
 
     diff = sub.add_parser(
         "diff",
@@ -208,7 +217,11 @@ def _run_scan(args: argparse.Namespace) -> int:
         print(f"error: {redact_text(str(exc))}", file=sys.stderr)
         return 2
 
-    card = score_harness(config, checks, policy)
+    hooks = getattr(config, "hooks", None) or []
+    detected = detect_evidence(root, hooks) if hooks else {}
+    card = score_harness(
+        config, checks, policy, detected=detected, credit_detected=args.credit_detected
+    )
     output = (
         render_json(card) if args.format == "json" else render_console(card, explain=args.explain)
     )

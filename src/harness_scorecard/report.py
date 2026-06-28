@@ -34,7 +34,13 @@ def _pending_dimension_ids(card: Scorecard) -> list[str]:
 def _check_line(check: CheckResult, *, explain: bool = False) -> list[str]:
     gate = f"  [GATE->{check.gate_cap.value}]" if check.is_gate and check.gate_cap else ""
     tag = "WAIV" if check.waived else _STATUS_TAG[check.status]
-    credited = "  (dispatcher-credited)" if check.dispatcher_credited else ""
+    credited = ""
+    if check.dispatcher_credited:
+        credited = (
+            "  (dispatcher-detected)"
+            if check.credit_source == "detected"
+            else "  (dispatcher-credited)"
+        )
     lines = [
         f"      [{tag}] {check.id}  {redact_text(check.title)}{gate}{credited}",
         f"             {redact_text(check.message)}",
@@ -73,12 +79,16 @@ def _policy_summary_lines(card: Scorecard) -> list[str]:
     out: list[str] = []
     waived = _waived_checks(card)
     credited = _credited_checks(card)
+    manifest_credited = [c for c in credited if c.credit_source != "detected"]
+    detected_credited = [c for c in credited if c.credit_source == "detected"]
     if waived or credited:
         parts = []
         if waived:
             parts.append(f"{len(waived)} finding(s) waived (excluded from the grade)")
-        if credited:
-            parts.append(f"{len(credited)} credited via dispatcher manifest")
+        if manifest_credited:
+            parts.append(f"{len(manifest_credited)} credited via dispatcher manifest")
+        if detected_credited:
+            parts.append(f"{len(detected_credited)} auto-detected behind the dispatcher")
         out.append(f"  Policy applied: {'; '.join(parts)}.")
         out.append("")
     if card.policy_notes:
@@ -175,6 +185,7 @@ def to_dict(card: Scorecard) -> dict[str, Any]:
                         "waived": c.waived,
                         "waiver_reason": redact_text(c.waiver_reason),
                         "dispatcher_credited": c.dispatcher_credited,
+                        "credit_source": c.credit_source,
                     }
                     for c in dim.checks
                 ],
@@ -206,6 +217,7 @@ def _check_from_dict(data: dict[str, Any], dimension_id: str) -> CheckResult:
         waived=data.get("waived", False),
         waiver_reason=data.get("waiver_reason", ""),
         dispatcher_credited=data.get("dispatcher_credited", False),
+        credit_source=data.get("credit_source", ""),
     )
 
 

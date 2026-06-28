@@ -109,6 +109,10 @@ class CheckResult:
     waived: bool = False
     waiver_reason: str = ""
     dispatcher_credited: bool = False
+    # How a dispatcher credit was established: "manifest" (operator-declared in the policy file)
+    # or "detected" (auto-found in the dispatcher source via introspection, lower-trust). Empty
+    # when the check is not dispatcher-credited.
+    credit_source: str = ""
 
     @property
     def triggered_gate_cap(self) -> Grade | None:

@@ -4,6 +4,26 @@ All notable changes to Harness Scorecard are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.0] - 2026-06-28
+
+### Added
+
+- **`scan --credit-detected`** and dispatcher introspection — the scorer now reads an opaque
+  dispatcher's source itself instead of relying solely on a hand-written manifest. For each check
+  whose guard lives behind a dispatcher, it looks for that guard's code signature (a named regex,
+  a guard call) in the dispatcher script and its in-directory siblings. By default a find is a
+  **suggestion** (a policy note: "evidence at `file:line` — verify and add to `[dispatcher].credits`,
+  or re-run with `--credit-detected`"), so the grade never moves silently. Passing
+  `--credit-detected` applies the finds as PARTIAL credits, rendered `(dispatcher-detected)` to
+  stay distinct from a hand-verified `(dispatcher-credited)` manifest entry (new `credit_source`
+  field in the JSON report).
+
+  Detection is deliberately conservative — a source match is evidence, not proof: comment and
+  triple-quoted docstring mentions are ignored, scanned paths are confined to the harness
+  directory (a `..` token can't escape it), only security-event dispatchers are read, and a
+  capability gate is **never** auto-credited (lifting a grade floor still requires a verified
+  manifest entry). Rubric unchanged at 1.0.0.
+
 ## [1.7.0] - 2026-06-28
 
 ### Added

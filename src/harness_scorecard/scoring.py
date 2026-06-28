@@ -23,10 +23,11 @@ from harness_scorecard.policy import EMPTY_POLICY, Policy
 from harness_scorecard.redaction import redact_path
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Mapping, Sequence
     from pathlib import Path
 
     from harness_scorecard.checks.base import Check
+    from harness_scorecard.introspect import Evidence
 
 
 class ScorableConfig(Protocol):
@@ -91,6 +92,7 @@ def _apply_policy(results: list[CheckResult], policy: Policy) -> list[str]:
         elif result.status is Status.FAIL:
             result.status = Status.PARTIAL
             result.dispatcher_credited = True
+            result.credit_source = "manifest"
         else:
             notes.append(
                 f"dispatcher credit for {check_id} is unnecessary (the check is not failing)"
@@ -111,19 +113,68 @@ def _apply_policy(results: list[CheckResult], policy: Policy) -> list[str]:
     return notes
 
 
+def _apply_detection(
+    results: list[CheckResult],
+    detected: Mapping[str, Evidence],
+    *,
+    credit: bool,
+) -> list[str]:
+    """Credit (or suggest) checks whose guard was auto-detected behind an opaque dispatcher.
+
+    Only acts on a still-FAIL, unwaived finding -- a manifest credit already lifted its check to
+    PARTIAL, and a waived check is excluded anyway. With ``credit`` set, upgrades FAIL -> PARTIAL
+    and tags the credit source ``detected`` (lower-trust than a manifest credit); otherwise emits
+    a suggestion note so the operator can verify the evidence and opt in.
+    """
+    by_id = {result.id: result for result in results}
+    notes: list[str] = []
+    for check_id, evidence in detected.items():
+        result = by_id.get(check_id)
+        if result is None or result.waived or result.status is not Status.FAIL:
+            continue
+        if credit and not result.is_gate:
+            result.status = Status.PARTIAL
+            result.dispatcher_credited = True
+            result.credit_source = "detected"
+            notes.append(
+                f"{check_id} auto-credited via --credit-detected (evidence: {evidence.location})"
+            )
+        elif credit and result.is_gate:
+            # A capability gate sets a grade floor; lifting it on a source-scan heuristic is too
+            # consequential, so a gate is never auto-credited -- it requires a verified manifest
+            # credit even under --credit-detected.
+            notes.append(
+                f"{check_id}: capability-gate evidence at {evidence.location} -- gates are never "
+                "auto-credited; verify and add to [dispatcher].credits manually"
+            )
+        else:
+            notes.append(
+                f"{check_id}: dispatcher guard evidence at {evidence.location} -- verify and add "
+                "to [dispatcher].credits, or re-run with --credit-detected"
+            )
+    return notes
+
+
 def score_harness(
     config: ScorableConfig,
     checks: Sequence[Check[Any]] = ALL_CHECKS,
     policy: Policy = EMPTY_POLICY,
+    *,
+    detected: Mapping[str, Evidence] | None = None,
+    credit_detected: bool = False,
 ) -> Scorecard:
     """Grade a parsed harness config against the rubric using the given check set.
 
     ``checks`` defaults to the Claude Code suite; the Codex adapter passes its own. Scored
     dimensions are derived from the checks that ran, so the engine stays harness-agnostic. An
-    optional operator ``policy`` waives accepted findings and credits dispatcher-declared checks.
+    optional operator ``policy`` waives accepted findings and credits dispatcher-declared checks;
+    ``detected`` carries dispatcher-introspection evidence, which ``credit_detected`` applies as
+    credits (otherwise it surfaces as a suggestion note).
     """
     results = [check.run(config) for check in checks]
     policy_notes = _apply_policy(results, policy)
+    if detected:
+        policy_notes.extend(_apply_detection(results, detected, credit=credit_detected))
     implemented_ids = list(dict.fromkeys(result.dimension for result in results))
 
     dimensions: list[DimensionResult] = []

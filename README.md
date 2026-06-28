@@ -231,6 +231,29 @@ A **waiver** excludes a finding from the grade (and suppresses its gate cap) but
 upgrades a declared check from FAIL to PARTIAL — half credit, "declared, not statically verified."
 See [`examples/harness-scorecard.toml`](examples/harness-scorecard.toml).
 
+### Auto-detect guards behind a dispatcher
+
+Writing that manifest by hand means reading the dispatcher yourself. `scan` can do the reading: it
+introspects the dispatcher source for each check's guard signature and, by default, **suggests**
+what to credit:
+
+```text
+  Policy notes:
+    ! CDX-D3-02: dispatcher guard evidence at user_prompt_submit_dispatch.py:124 -- verify and add to [dispatcher].credits, or re-run with --credit-detected
+```
+
+Pass `--credit-detected` to apply those finds as PARTIAL credits, labeled `(dispatcher-detected)`
+to keep them distinct from a hand-verified `(dispatcher-credited)` manifest entry:
+
+```bash
+$ harness-scorecard scan ~/.codex --credit-detected
+```
+
+A source match is *evidence, not proof*, so detection stays conservative: suggest-only by default,
+comment and docstring mentions are ignored, scanned paths are confined to the harness directory,
+and a capability gate is never auto-credited — lifting a grade floor still requires a verified
+manifest entry.
+
 ## GitHub Action
 
 Grade your harness in CI and upload the findings to code scanning:

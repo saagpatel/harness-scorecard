@@ -42,6 +42,15 @@ _DISPATCHER_RE = re.compile(
 _SCRIPT_RE = re.compile(r"[\w.\-/]*\.(?:py|sh|js|ts|rb)", re.IGNORECASE)
 
 
+def is_dispatcher_command(command: str) -> bool:
+    """True when a hook command routes through an opaque dispatcher (by name idiom).
+
+    Shared by the caveat detector and dispatcher introspection so both agree on what counts
+    as a dispatcher.
+    """
+    return bool(_DISPATCHER_RE.search(command))
+
+
 def _script_name(command: str) -> str:
     """Best-effort script basename from a hook command, for a readable caveat.
 
@@ -67,7 +76,7 @@ def detect_dispatcher_caveats(hooks: Sequence[HookEntry]) -> list[str]:
     seen: set[tuple[str, str]] = set()
     caveats: list[str] = []
     for hook in hooks:
-        if hook.event not in _SECURITY_EVENTS or not _DISPATCHER_RE.search(hook.command):
+        if hook.event not in _SECURITY_EVENTS or not is_dispatcher_command(hook.command):
             continue
         script = _script_name(hook.command)
         key = (hook.event, script)
