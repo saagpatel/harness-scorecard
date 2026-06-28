@@ -1,6 +1,6 @@
 [project]
 name = "harness-scorecard"
-version = "1.0.0"
+version = "1.0.1"
 description = "A read-only linter and A-F maturity grader for coding-agent harnesses (Claude Code, Codex)."
 readme = "README.md"
 license = "MIT"
@@ -19,7 +19,7 @@ keywords = [
     "supply-chain",
 ]
 classifiers = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 5 - Production/Stable",
     "Environment :: Console",
     "Intended Audience :: Developers",
     "Operating System :: OS Independent",

@@ -1,7 +1,7 @@
 """Command-line entry point: ``harness-scorecard scan <path>``.
 
-Exit codes mirror a linter contract: 0 = healthy (A/B), 1 = needs attention (C/D/F),
-2 = invalid input (no harness found).
+Exit codes mirror a linter contract: 0 = grade meets ``--min-grade`` (default B),
+1 = grade below the bar, 2 = invalid input (no harness found).
 """
 
 from __future__ import annotations
@@ -14,6 +14,7 @@ from pathlib import Path
 from harness_scorecard.dispatch import HARNESS_TYPES, select_adapter
 from harness_scorecard.htmlreport import render_html
 from harness_scorecard.models import RUBRIC_VERSION, Grade, grade_rank
+from harness_scorecard.redaction import redact_text
 from harness_scorecard.report import render_console, render_json
 from harness_scorecard.sarif import render_sarif
 from harness_scorecard.scoring import score_harness
@@ -83,7 +84,7 @@ def _run_scan(args: argparse.Namespace) -> int:
     try:
         config, checks = select_adapter(root, args.harness_type)
     except FileNotFoundError as exc:
-        print(f"error: {exc}", file=sys.stderr)
+        print(f"error: {redact_text(str(exc))}", file=sys.stderr)
         return 2
 
     card = score_harness(config, checks)

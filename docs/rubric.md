@@ -168,6 +168,25 @@ harness shows in config. *Failure mode* = the documented incident it guards agai
   Signal: `permissions.deny` covers browser-extension wallet storage (e.g. metamask/phantom).
   Failure mode: crypto keystore theft.
 
+### D2 — Egress / exfiltration control (weight 4)
+
+- **HS-D2-01 — Network-egress guard on Bash (4, STATIC)**: PreToolUse hook inspecting
+  `curl`/`wget` for exfil; `wget` denied. FM: `curl --data @secret` to attacker host.
+- **HS-D2-02 — MCP resource enumeration denied (3, STATIC)**: `ListMcpResourcesTool(*)` /
+  `ReadMcpResourceTool(*)` in `permissions.deny`. FM: bulk resource dump.
+- **HS-D2-03 — MCP output cap set (2, STATIC)**: `env.MAX_MCP_OUTPUT_TOKENS` bounded. FM:
+  oversized MCP payload floods context / exfil channel.
+
+### D3 — Tool-surface & inbound-injection defense (weight 4)
+
+- **HS-D3-01 — MCP lane is gated (5, STATIC)**: a PreToolUse matcher covers `mcp__.*`
+  (not Bash-only). FM: MCP calls bypassing the whole guard stack.
+- **HS-D3-02 — Inbound-content sentinels present (4, PARTIAL)**: PostToolUse sentinels on
+  all three inbound vectors — MCP output, web fetch/search, file read/grep. PARTIAL:
+  presence STATIC, defusing efficacy behavioral. FM: prompt injection via fetched/returned text.
+- **HS-D3-03 — PreToolUse matcher breadth (3, STATIC)**: guards match
+  `Bash|mcp__.*|Read|Edit|Write`, not Bash alone. FM: narrow matchers leave lanes open.
+
 ### D4 — Destructive-action & git safety (weight 5, GATE)
 
 - **HS-D4-01 — Push to protected branch effectively blocked (5, STATIC) [GATE→C]**
@@ -189,25 +208,6 @@ harness shows in config. *Failure mode* = the documented incident it guards agai
   Signal: a `git-safety` hook covering `--force`/`--no-verify`; PARTIAL because policy
   documented only in `rules/*.md` is advisory. Failure mode: force-push drops origin-ahead commits.
 
-### D2 — Egress / exfiltration control (weight 4)
-
-- **HS-D2-01 — Network-egress guard on Bash (4, STATIC)**: PreToolUse hook inspecting
-  `curl`/`wget` for exfil; `wget` denied. FM: `curl --data @secret` to attacker host.
-- **HS-D2-02 — MCP resource enumeration denied (3, STATIC)**: `ListMcpResourcesTool(*)` /
-  `ReadMcpResourceTool(*)` in `permissions.deny`. FM: bulk resource dump.
-- **HS-D2-03 — MCP output cap set (2, STATIC)**: `env.MAX_MCP_OUTPUT_TOKENS` bounded. FM:
-  oversized MCP payload floods context / exfil channel.
-
-### D3 — Tool-surface & inbound-injection defense (weight 4)
-
-- **HS-D3-01 — MCP lane is gated (5, STATIC)**: a PreToolUse matcher covers `mcp__.*`
-  (not Bash-only). FM: MCP calls bypassing the whole guard stack.
-- **HS-D3-02 — Inbound-content sentinels present (4, PARTIAL)**: PostToolUse sentinels on
-  all three inbound vectors — MCP output, web fetch/search, file read/grep. PARTIAL:
-  presence STATIC, defusing efficacy behavioral. FM: prompt injection via fetched/returned text.
-- **HS-D3-03 — PreToolUse matcher breadth (3, STATIC)**: guards match
-  `Bash|mcp__.*|Read|Edit|Write`, not Bash alone. FM: narrow matchers leave lanes open.
-
 ### D5 — Harness self-protection & integrity (weight 5, GATE)
 
 - **HS-D5-01 — Harness config write-protected (5, STATIC) [GATE→C]**: read-path **and**
@@ -215,7 +215,7 @@ harness shows in config. *Failure mode* = the documented incident it guards agai
   `skills/*`. FM: injection mutates the guard layer itself.
 - **HS-D5-02 — Hook integrity verify + self-heal (4, STATIC)**: SessionStart integrity
   verification and self-heal. FM: a hook is silently edited/disabled, weakening the floor.
-- **HS-D5-03 — Config snapshot/restore around edits (3, STATIC)**: snapshot-before-mutate +
+- **HS-D5-03 — Config snapshot/validate around edits (3, STATIC)**: snapshot-before-mutate +
   post-edit validation of `settings.json`. FM: settings.json silently truncates to a
   bypass-accept stub with no backup.
 

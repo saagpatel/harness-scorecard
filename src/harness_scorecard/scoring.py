@@ -43,12 +43,22 @@ def _weighted_score(checks: list[CheckResult]) -> float:
     return sum(weight * score for weight, score in scored) / total_weight
 
 
+def _dimension_applies(dimension: DimensionResult) -> bool:
+    """A dimension counts toward the overall only if at least one check applied (non-N/A)."""
+    return any(check.status.score is not None for check in dimension.checks)
+
+
 def _overall_score(dimensions: list[DimensionResult]) -> float:
-    """Dimension-weighted average over dimensions that produced a score."""
-    total_weight = sum(dim.weight for dim in dimensions)
+    """Dimension-weighted average over dimensions that have at least one applicable check.
+
+    A dimension whose checks are all N/A is excluded entirely rather than counted as a zero,
+    so a harness genuinely not subject to a dimension is not penalized for it.
+    """
+    applicable = [dim for dim in dimensions if _dimension_applies(dim)]
+    total_weight = sum(dim.weight for dim in applicable)
     if total_weight == 0:
         return 0.0
-    return sum(dim.weight * dim.score for dim in dimensions) / total_weight
+    return sum(dim.weight * dim.score for dim in applicable) / total_weight
 
 
 def score_harness(

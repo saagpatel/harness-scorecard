@@ -36,7 +36,7 @@ def _check_row(check: dict[str, Any]) -> str:
     color = _STATUS_COLOR.get(check["status"], "#6e7781")
     gate = (
         f' <span class="gate">GATE&rarr;{_esc(check["gate_cap"])}</span>'
-        if check["is_gate"]
+        if check["is_gate"] and check["gate_cap"]
         else ""
     )
     evidence = "".join(f"<li>{_esc(item)}</li>" for item in check["evidence"])

@@ -116,7 +116,10 @@ def _merge_settings(base: dict[str, Any], local: dict[str, Any]) -> dict[str, An
     if base_hooks or local_hooks:
         merged_hooks: dict[str, Any] = {**base_hooks}
         for event, groups in local_hooks.items():
-            merged_hooks[event] = list(merged_hooks.get(event, [])) + list(groups)
+            existing = merged_hooks.get(event)
+            existing = existing if isinstance(existing, list) else []
+            extra = groups if isinstance(groups, list) else []
+            merged_hooks[event] = existing + extra
         merged["hooks"] = merged_hooks
     return merged
 

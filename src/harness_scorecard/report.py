@@ -23,9 +23,9 @@ def _pending_dimension_ids(card: Scorecard) -> list[str]:
 
 
 def _check_line(check: CheckResult) -> list[str]:
-    gate = f"  [GATE->{check.gate_cap.value}]" if check.gate_cap else ""
+    gate = f"  [GATE->{check.gate_cap.value}]" if check.is_gate and check.gate_cap else ""
     lines = [
-        f"      [{_STATUS_TAG[check.status]}] {check.id}  {check.title}{gate}",
+        f"      [{_STATUS_TAG[check.status]}] {check.id}  {redact_text(check.title)}{gate}",
         f"             {redact_text(check.message)}",
         *(f"             - {redact_text(item)}" for item in check.evidence),
     ]
@@ -91,7 +91,7 @@ def to_dict(card: Scorecard) -> dict[str, Any]:
                 "checks": [
                     {
                         "id": c.id,
-                        "title": c.title,
+                        "title": redact_text(c.title),
                         "status": c.status.value,
                         "weight": c.weight,
                         "severity": c.severity.value,

@@ -4,6 +4,29 @@ All notable changes to Harness Scorecard are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.1] - 2026-06-27
+
+Patch release: hardening and consistency fixes from a full-codebase audit. No change to
+grading behavior for well-formed harnesses.
+
+### Fixed
+
+- **Graceful degradation** — a malformed `settings.json` with a null or non-list hook event
+  (e.g. `"hooks": {"PreToolUse": null}`) no longer raises `TypeError` during the settings/local
+  merge; it degrades to an empty inventory as the contract promises.
+- **Privacy** — the "no harness found" error path now redacts the home path before writing to
+  stderr, so a real path can't leak into CI logs.
+- **Scoring** — a dimension whose checks are all N/A is excluded from the overall score instead
+  of counted as a zero (latent edge case; no effect on current harnesses).
+- **Output consistency** — `check.title` is now redacted in the console and JSON renderers (it
+  was already redacted in HTML and SARIF), and the `[GATE]` label uses the same predicate in
+  every renderer.
+
+### Changed
+
+- Trove classifier bumped to `Development Status :: 5 - Production/Stable` to match the GA.
+- `docs/rubric.md` §5 reordered to D1–D10 and minor check-title wording aligned with the code.
+
 ## [1.0.0] - 2026-06-27
 
 First public release. A read-only A–F maturity grader for coding-agent harness
