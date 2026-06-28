@@ -14,6 +14,7 @@ from harness_scorecard.discovery import load_harness
 from harness_scorecard.htmlreport import render_html
 from harness_scorecard.models import RUBRIC_VERSION, Grade
 from harness_scorecard.report import render_console, render_json
+from harness_scorecard.sarif import render_sarif
 from harness_scorecard.scoring import score_harness
 
 _HEALTHY_GRADES = (Grade.A, Grade.B)
@@ -49,6 +50,12 @@ def _build_parser() -> argparse.ArgumentParser:
         metavar="FILE",
         help="Also write a self-contained HTML scorecard to FILE.",
     )
+    scan.add_argument(
+        "--sarif",
+        dest="sarif_out",
+        metavar="FILE",
+        help="Also write a SARIF 2.1.0 report to FILE (for CI / code scanning).",
+    )
     return parser
 
 
@@ -68,6 +75,8 @@ def _run_scan(args: argparse.Namespace) -> int:
         Path(args.json_out).expanduser().write_text(render_json(card), encoding="utf-8")
     if args.html_out:
         Path(args.html_out).expanduser().write_text(render_html(card), encoding="utf-8")
+    if args.sarif_out:
+        Path(args.sarif_out).expanduser().write_text(render_sarif(card), encoding="utf-8")
 
     return 0 if card.grade in _HEALTHY_GRADES else 1
 

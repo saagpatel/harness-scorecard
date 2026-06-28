@@ -2,6 +2,7 @@
 
 import contextlib
 import io
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -11,7 +12,6 @@ from harness_scorecard.htmlreport import render_html
 from harness_scorecard.scoring import score_harness
 
 FIXTURES = Path(__file__).parent / "fixtures"
-SCRATCH = Path("/private/tmp/claude-501/-Users-d/c7b31602-76dc-4835-90af-3e5c4fb27c52/scratchpad")
 
 
 class TestRenderHtml(unittest.TestCase):
@@ -37,16 +37,13 @@ class TestRenderHtml(unittest.TestCase):
 
 class TestCliHtmlFlag(unittest.TestCase):
     def test_html_flag_writes_file(self):
-        SCRATCH.mkdir(parents=True, exist_ok=True)
-        out_path = SCRATCH / "scorecard_test.html"
-        if out_path.exists():
-            out_path.unlink()
-        with contextlib.redirect_stdout(io.StringIO()):
-            code = main(["scan", str(FIXTURES / "strong_harness"), "--html", str(out_path)])
-        self.assertEqual(code, 0)
-        self.assertTrue(out_path.exists())
-        self.assertIn(">A<", out_path.read_text(encoding="utf-8"))
-        out_path.unlink()
+        with tempfile.TemporaryDirectory() as tmp:
+            out_path = Path(tmp) / "scorecard_test.html"
+            with contextlib.redirect_stdout(io.StringIO()):
+                code = main(["scan", str(FIXTURES / "strong_harness"), "--html", str(out_path)])
+            self.assertEqual(code, 0)
+            self.assertTrue(out_path.exists())
+            self.assertIn(">A<", out_path.read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":
