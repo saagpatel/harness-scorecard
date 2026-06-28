@@ -4,7 +4,10 @@
 > operating mature coding-agent harnesses into a set of statically-checkable signals,
 > scored into an A–F maturity grade. Generic "best practice" advice is explicitly out
 > of scope: every check below traces to a concrete failure mode that has actually bitten
-> a running harness.
+> a running harness. The six capability **gates** are not just asserted — each is *proven*
+> by a vulnerable/guarded fixture pair in [`examples/redteam/`](../examples/redteam/), where
+> the scorer mechanically FAILs the missing-guard config and PASSes the guarded one. Each
+> gate below carries a **Proof:** back-link to its entry.
 
 ## 1. What this grades (and what it does not)
 
@@ -151,6 +154,7 @@ harness shows in config. *Failure mode* = the documented incident it guards agai
   `~/.ssh`, `~/.aws`, `~/.gnupg`, an `op`/1Password config dir, `~/.config/gcloud`, and
   `**/.env*`. PASS = all core paths; PARTIAL = some; FAIL = none.
   Failure mode: agent (or an injected instruction) reads private keys / cloud creds and exfiltrates.
+  Proof: [`examples/redteam/claude-d1-credential-exposure`](../examples/redteam/claude-d1-credential-exposure/ATTACK.md).
 - **HS-D1-02 — Sensitive-read Bash backstop (3, STATIC)**
   Signal: a PreToolUse `Bash` hook that re-blocks sensitive-file reads, so a crafted
   `cat ~/.ssh/id_rsa` can't slip past tool-level denies. Failure mode: deny lists only
@@ -195,6 +199,7 @@ harness shows in config. *Failure mode* = the documented incident it guards agai
   encodes this *only* in `autoMode.hard_deny` while running `bypassPermissions` scores
   **FAIL** here. This is the bypass-aware check.
   Failure mode: agent or injection pushes straight to a protected branch.
+  Proof: [`examples/redteam/claude-d4-inert-harddeny`](../examples/redteam/claude-d4-inert-harddeny/ATTACK.md) — the bypass-aware flagship.
 - **HS-D4-02 — Catastrophic deletion blocked (4, STATIC)**
   Signal: effective-floor block on `rm -rf` at shallow depth / dangerous-command hook.
   Failure mode: `rm -rf ~` or depth-≤1 home deletes.
@@ -213,6 +218,7 @@ harness shows in config. *Failure mode* = the documented incident it guards agai
 - **HS-D5-01 — Harness config write-protected (5, STATIC) [GATE→C]**: read-path **and**
   write-path guards both protect the harness's own `hooks/`, `agents/`, `settings*.json`,
   `skills/*`. FM: injection mutates the guard layer itself.
+  Proof: [`examples/redteam/claude-d5-unprotected-config`](../examples/redteam/claude-d5-unprotected-config/ATTACK.md).
 - **HS-D5-02 — Hook integrity verify + self-heal (4, STATIC)**: SessionStart integrity
   verification and self-heal. FM: a hook is silently edited/disabled, weakening the floor.
 - **HS-D5-03 — Config snapshot/validate around edits (3, STATIC)**: snapshot-before-mutate +
@@ -302,6 +308,7 @@ approval inside that directory.
 - **CDX-D1-01 — Secrets kept out of the subprocess env (3, STATIC) [GATE→D]**: the default
   secret excludes are active (not `ignore_default_excludes`) and no secret-named var is `set`.
   FM: every shell command the agent runs inherits your API keys/tokens.
+  Proof: [`examples/redteam/codex-d1-env-secret-leak`](../examples/redteam/codex-d1-env-secret-leak/ATTACK.md).
 - **CDX-D1-02 — Credential-read guard hook (2, STATIC)**: a PreToolUse hook blocks reading
   `~/.ssh`/`~/.aws`/`~/.gnupg`. FM: the sandbox permits reading credential stores.
 - **CDX-D1-03 — Sandbox bounds write blast-radius (2, STATIC)**: `sandbox_mode` is not
@@ -325,6 +332,7 @@ approval inside that directory.
 - **CDX-D4-01 — Effective gate on destructive actions (3, STATIC) [GATE→C]**: at least two of
   {approval not `never`, sandbox not `danger`, Bash git hook}. FM: `danger`+`never`+no hook runs
   `rm -rf` / `git push` unchecked.
+  Proof: [`examples/redteam/codex-d4-full-access`](../examples/redteam/codex-d4-full-access/ATTACK.md) — Codex's effective bypass (and why it cascades across D1/D4/D5).
 - **CDX-D4-02 — Git-safety Bash hook (2, STATIC)**: a PreToolUse Bash hook guards
   git/destructive commands. FM: force-push / destructive shell.
 - **CDX-D4-03 — Approval gates before execution (2, STATIC)**: `approval_policy` is
@@ -339,6 +347,7 @@ approval inside that directory.
 - **CDX-D5-01 — Agent cannot mutate its own harness (3, STATIC) [GATE→C]**: `~/.codex` is out
   of write scope (sandbox not `danger`, not in `writable_roots`) or a self-protect hook guards
   it. FM: injection rewrites the guard layer itself.
+  Proof: [`examples/redteam/codex-d5-self-mutable`](../examples/redteam/codex-d5-self-mutable/ATTACK.md).
 - **CDX-D5-02 — Operating contract declared (1, STATIC)**: `AGENTS.md` present.
 - **CDX-D5-03 — Self-protection hook (1, STATIC)**: a hook guards writes to the harness config.
 

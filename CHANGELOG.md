@@ -4,6 +4,27 @@ All notable changes to Harness Scorecard are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2026-06-28
+
+### Added
+
+- **Red-team validation corpus (`examples/redteam/`)** — the rubric's central claim ("every
+  gated check traces to a documented red-team failure mode") is now *proven*, not just asserted.
+  Each of the six capability gates ships a vulnerable/guarded pair of static config fixtures: a
+  plausible, otherwise-strong harness missing exactly one guard, beside its fixed twin. Covers
+  Claude Code (`HS-D1-01`→D, `HS-D4-01`→C, `HS-D5-01`→C) and Codex (`CDX-D1-01`→D, `CDX-D4-01`→C,
+  `CDX-D5-01`→C). Every entry carries an `ATTACK.md` (threat narrative + the gate that catches it
+  + the one-line fix); defensive only — the fixtures are inert config and nothing executes.
+- **`tests/test_redteam_corpus.py`** — a data-driven proof that mechanically FAILs each gated
+  check on its `vulnerable/` config (gate present in `gate_caps`, grade capped) and PASSes it on
+  `guarded/`. For five of six, the vulnerable harness scores in the A band on raw signal and is
+  dragged to the cap by that single gate; `codex-d4` is documented as the cascade exception.
+- **`docs/rubric.md`** back-links each gate to its corpus entry (claim ↔ proof), and the README
+  gains a **"Proven, not asserted"** section.
+
+The rubric is unchanged at **1.0.0** — this release proves existing checks, it does not add or
+reweight any, so grades stay directly comparable to prior releases.
+
 ## [1.3.0] - 2026-06-28
 
 ### Added

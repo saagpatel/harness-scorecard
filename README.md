@@ -75,6 +75,28 @@ dispatcher script hides its logic from static analysis, so the named-guard check
 it. Rather than silently mark it down, the report emits a **caveat** — "a low score here may be
 a static-analysis limit, not a missing guard" — so the grade is never misread as "insecure."
 
+## Proven, not asserted
+
+The rubric claims every gated check traces to a real red-team failure mode. That claim is
+**tested**, not just stated. [`examples/redteam/`](examples/redteam/) holds a vulnerable/guarded
+fixture pair for each of the six capability gates: a plausible, otherwise-strong harness that is
+missing exactly one guard, beside its fixed twin. [`tests/test_redteam_corpus.py`](tests/test_redteam_corpus.py)
+mechanically asserts that the scorer **FAILs** the gated check on the vulnerable config (and the
+gate caps the grade) and **PASSes** it on the guarded one — so the moat can't quietly rot.
+
+For five of the six, the vulnerable harness scores in the **A band on raw signal** and is
+dragged to the cap by that single gate — the cleanest demonstration that the gate, not general
+weakness, is what bit:
+
+```bash
+harness-scorecard scan examples/redteam/claude-d4-inert-harddeny/vulnerable   # F/D/C — gate capped
+harness-scorecard scan examples/redteam/claude-d4-inert-harddeny/guarded      # A — one guard added
+```
+
+Every config is static and inert; nothing executes. Each [`ATTACK.md`](examples/redteam/claude-d4-inert-harddeny/ATTACK.md)
+narrates the threat, the gate that catches it, and the one-line fix. This is the moat: not
+"trust our checklist," but "here is the attack, and here is the proof we catch it."
+
 ## Usage
 
 ```bash

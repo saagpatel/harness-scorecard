@@ -1,0 +1,267 @@
+{
+  "permissions": {
+    "defaultMode": "bypassPermissions",
+    "deny": [
+      "Read(~/.ssh/**)",
+      "Read(~/.aws/**)",
+      "Read(~/.gnupg/**)",
+      "Read(~/.config/op/**)",
+      "Read(~/.config/gcloud/**)",
+      "Read(**/.env*)",
+      "Read(~/.harness/.tokens/**)",
+      "Read(~/Library/Application Support/**/metamask*/**)",
+      "Bash(wget *)",
+      "Bash(rm -rf /*)",
+      "ListMcpResourcesTool(*)",
+      "ReadMcpResourceTool(*)"
+    ],
+    "allow": [
+      "Read",
+      "Glob",
+      "Grep",
+      "Bash(git status)",
+      "Bash(npm ci)"
+    ]
+  },
+  "env": {
+    "DISABLE_TELEMETRY": "1",
+    "DISABLE_ERROR_REPORTING": "1",
+    "MAX_MCP_OUTPUT_TOKENS": "50000"
+  },
+  "autoMode": {
+    "hard_deny": [
+      "Read or transmit ~/.ssh, ~/.aws, ~/.gnupg",
+      "Push to main or master",
+      "Destructive DB operations on non-localhost hosts",
+      "Mutate the harness config directory",
+      "rm -rf at depth <= 1 from $HOME"
+    ]
+  },
+  "worktree": {
+    "enabled": true
+  },
+  "skillListingBudgetFraction": 0.035,
+  "maxSkillDescriptionChars": 512,
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${DIR}/hooks/hook-integrity-verify.sh"
+          },
+          {
+            "type": "command",
+            "command": "${DIR}/hooks/harness-self-heal.sh"
+          },
+          {
+            "type": "command",
+            "command": "${DIR}/hooks/settings-guard.sh"
+          },
+          {
+            "type": "command",
+            "command": "${DIR}/hooks/worktree-init.sh"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${DIR}/hooks/block-dangerous-cmds.sh"
+          },
+          {
+            "type": "command",
+            "command": "${DIR}/hooks/git-safety.sh"
+          },
+          {
+            "type": "command",
+            "command": "${DIR}/hooks/db-guard.sh"
+          },
+          {
+            "type": "command",
+            "command": "${DIR}/hooks/protect-sensitive-reads.sh"
+          },
+          {
+            "type": "command",
+            "command": "${DIR}/hooks/confirm-token-required.sh"
+          },
+          {
+            "type": "command",
+            "command": "${DIR}/hooks/bash-egress-guard.sh"
+          },
+          {
+            "type": "command",
+            "command": "${DIR}/hooks/remote-command-guard.sh"
+          },
+          {
+            "type": "command",
+            "command": "${DIR}/hooks/defer-destructive.sh"
+          },
+          {
+            "type": "command",
+            "command": "${DIR}/hooks/protect-claude-writes.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${DIR}/hooks/detect-secrets.sh"
+          },
+          {
+            "type": "command",
+            "command": "${DIR}/hooks/harness-config-snapshot.sh"
+          },
+          {
+            "type": "command",
+            "command": "${DIR}/hooks/skill-install-gate.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "Read|Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${DIR}/hooks/protect-files.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${DIR}/hooks/mcp-guard.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "Agent",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${DIR}/hooks/subagent-scope-linter.sh"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "mcp__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${DIR}/hooks/content-sentinel.sh"
+          },
+          {
+            "type": "command",
+            "command": "${DIR}/hooks/mcp-audit-log.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "WebFetch|WebSearch",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${DIR}/hooks/webfetch-sentinel.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "Read|Grep",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${DIR}/hooks/read-grep-sentinel.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${DIR}/hooks/bash-audit-log.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${DIR}/hooks/harness-config-validate.sh"
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${DIR}/hooks/precompact-backup.sh"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${DIR}/hooks/stop-gate.sh"
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${DIR}/hooks/subagent-quality-gate.sh"
+          }
+        ]
+      }
+    ],
+    "TaskCompleted": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${DIR}/hooks/task-completed-verify.sh"
+          }
+        ]
+      }
+    ],
+    "PermissionDenied": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${DIR}/hooks/permission-denied-log.sh"
+          }
+        ]
+      }
+    ],
+    "PostToolUseFailure": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${DIR}/hooks/tool-failure-log.sh"
+          }
+        ]
+      }
+    ]
+  }
+}
