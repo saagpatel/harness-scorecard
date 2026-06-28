@@ -22,6 +22,9 @@ harness rooted at a `.claude/`-style directory:
 | Capability surface | `skills/`, `skill-rules.json` | Installed skills and their provenance/injection surface |
 | Environment | `settings.json` → `env` | Telemetry, model pins, output caps |
 
+For a **Codex** harness, the equivalent surface (sandbox, approval policy, trust levels,
+`hooks.json`, `AGENTS.md`) and its `CDX-*` checks are documented in §6.
+
 **Not graded (out of scope for v1):** runtime behavior, the quality of agent *output*,
 the repository the agent works on (that is a different subject — see
 `ai-harness-scorecard`, which grades repos), or anything requiring execution. We grade
@@ -61,6 +64,8 @@ effective_floor(config) =
 
 A protection that exists *solely* in `hard_deny` while the harness runs in bypass mode
 scores as **absent**. This is encoded directly in check logic, not as a cosmetic footnote.
+The same insight maps to Codex (`sandbox_mode = "danger-full-access"` + `approval_policy =
+"never"`); see §6.
 
 ## 4. Scoring model: weighted, gated, banded
 
@@ -252,14 +257,124 @@ harness shows in config. *Failure mode* = the documented incident it guards agai
 - **HS-D10-02 — Failure & denial logging (2, STATIC)**: `PermissionDenied` /
   `PostToolUseFailure` / `StopFailure` log hooks. FM: silent failures leave no trail.
 
-## 6. Privacy & redaction
+## 6. Codex adapter — same rubric, different guard surface
+
+The ten dimensions, the scoring math, the gates, and the A–F bands are **identical** for
+Codex. Only the *evidence* differs: Codex governs the agent through a filesystem **sandbox**, a
+human **approval policy**, per-project **trust levels**, MCP servers, and a `hooks.json` whose
+schema matches Claude Code's — not a permission mode plus deny globs. The harness type is
+auto-detected (Claude Code → `settings.json`; Codex → `config.toml` / `AGENTS.md`) and each
+harness runs its own check suite (`HS-*` vs `CDX-*`) over the shared engine.
+
+**Codex surface:**
+
+| Surface | File / key | What it tells the scorer |
+|---|---|---|
+| Filesystem sandbox | `config.toml` → `sandbox_mode` | `read-only` / `workspace-write` / `danger-full-access` — the core write/exec guardrail |
+| Network | `config.toml` → `[sandbox_workspace_write].network_access`, `web_search` | Outbound egress channels |
+| Human gate | `config.toml` → `approval_policy` | `untrusted` / `on-failure` / `on-request` / `never` — when a command needs approval |
+| Trust | `config.toml` → `[projects."…"].trust_level` | Directories where approval is suppressed |
+| Env hygiene | `config.toml` → `[shell_environment_policy]` | Whether secret-named env vars reach subprocesses |
+| Active guards | `hooks.json` → `SessionStart`/`UserPromptSubmit`/`PreToolUse`/`PermissionRequest`/`PostToolUse`/`Stop` | Lifecycle scripts (same schema as Claude Code) |
+| Delegation | `config.toml` → `[agents]` (`max_threads`, `max_depth`, per-role `approval_policy`, `config_file`) | Subagent fan-out and governance |
+| Behavioral contract | `AGENTS.md` / `AGENTS.override.md` | Documented operating rules |
+| History | `config.toml` → `[history].persistence`, `notify` | Audit trail and turn signalling |
+
+**The effective-floor analog (§3, for Codex):** Claude Code's `bypassPermissions` makes
+`hard_deny` inert; Codex's equivalent is **`sandbox_mode = "danger-full-access"` (sandbox inert)
+combined with `approval_policy = "never"` (no human gate)**. When both hold, destructive and
+exfiltrating actions run unchecked, and the gated checks compute against what remains (hooks
+only). A `[projects."…"].trust_level = "trusted"` likewise lowers the floor by suppressing
+approval inside that directory.
+
+**Codex gates** (same caps as Claude Code):
+
+| Gate check fails | Grade capped at |
+|---|---|
+| Secrets exposed to the subprocess env (`CDX-D1-01`) | **D** |
+| No effective gate on destructive actions (`CDX-D4-01`) | **C** |
+| Agent can rewrite its own harness (`CDX-D5-01`) | **C** |
+
+### Codex checks by dimension
+
+**D1 — Secret protection (weight 5, GATE).** Codex's sandbox bounds *writes* but permits
+*reads*, so credential protection rests on env hygiene first.
+- **CDX-D1-01 — Secrets kept out of the subprocess env (3, STATIC) [GATE→D]**: the default
+  secret excludes are active (not `ignore_default_excludes`) and no secret-named var is `set`.
+  FM: every shell command the agent runs inherits your API keys/tokens.
+- **CDX-D1-02 — Credential-read guard hook (2, STATIC)**: a PreToolUse hook blocks reading
+  `~/.ssh`/`~/.aws`/`~/.gnupg`. FM: the sandbox permits reading credential stores.
+- **CDX-D1-03 — Sandbox bounds write blast-radius (2, STATIC)**: `sandbox_mode` is not
+  `danger-full-access`. FM: secrets written anywhere on disk.
+
+**D2 — Egress (weight 4).**
+- **CDX-D2-01 — Sandbox denies outbound network (2, STATIC)**: `read-only`/`workspace-write`
+  deny network by default. FM: `curl --data @secret` to an attacker host.
+- **CDX-D2-02 — Web search not live (1, STATIC)**: `web_search` is `cached`/`disabled`/`off`
+  (`live` FAILs). FM: live fetch is an ingestion/egress channel.
+- **CDX-D2-03 — Egress independently monitored (1, STATIC)**: an egress-guard hook (sandbox-
+  blocked alone is PARTIAL). FM: no defense in depth if the sandbox is misconfigured.
+
+**D3 — Tool-surface & injection (weight 4).**
+- **CDX-D3-01 — Tool calls intercepted (2, STATIC)**: a `PreToolUse`/`PermissionRequest` hook
+  intercepts every tool call (its policy is opaque to static analysis). FM: ungoverned surface.
+- **CDX-D3-02 — Inbound content screened (2, STATIC)**: a sanitization hook on
+  `UserPromptSubmit`/`PreToolUse`. FM: prompt injection via user prompt or tool output.
+
+**D4 — Destructive / git (weight 5, GATE).**
+- **CDX-D4-01 — Effective gate on destructive actions (3, STATIC) [GATE→C]**: at least two of
+  {approval not `never`, sandbox not `danger`, Bash git hook}. FM: `danger`+`never`+no hook runs
+  `rm -rf` / `git push` unchecked.
+- **CDX-D4-02 — Git-safety Bash hook (2, STATIC)**: a PreToolUse Bash hook guards
+  git/destructive commands. FM: force-push / destructive shell.
+- **CDX-D4-03 — Approval gates before execution (2, STATIC)**: `approval_policy` is
+  `on-request`/`untrusted` (PASS), `on-failure` (PARTIAL), `never` (FAIL).
+
+**D5 — Self-protection (weight 5, GATE).**
+- **CDX-D5-01 — Agent cannot mutate its own harness (3, STATIC) [GATE→C]**: `~/.codex` is out
+  of write scope (sandbox not `danger`, not in `writable_roots`) or a self-protect hook guards
+  it. FM: injection rewrites the guard layer itself.
+- **CDX-D5-02 — Operating contract declared (1, STATIC)**: `AGENTS.md` present.
+- **CDX-D5-03 — Self-protection hook (1, STATIC)**: a hook guards writes to the harness config.
+
+**D6 — Verification (weight 3).**
+- **CDX-D6-01 — Stop-gate verifies completion (2, STATIC)**: a `Stop` verification hook.
+- **CDX-D6-02 — Independent verification agent (1, STATIC)**: a QA/closeout/review agent role.
+
+**D7 — Subagent governance (weight 3).**
+- **CDX-D7-01 — Fan-out bounded (2, STATIC)**: `max_threads` AND `max_depth` set (one → PARTIAL).
+- **CDX-D7-02 — No role bypasses approval (1, STATIC)**: no `[agents.*]` runs
+  `approval_policy = "never"` (N/A when no roles are declared).
+
+**D8 — Recovery (weight 2).** Codex has no PreCompact analog; the checks credit what its
+surface offers.
+- **CDX-D8-01 — Sandbox confines changes (1, STATIC)**: `sandbox_mode` not `danger` (reversible).
+- **CDX-D8-02 — Session-start checkpoint (1, STATIC)**: a `SessionStart` hook.
+
+**D9 — Provenance (weight 2).**
+- **CDX-D9-01 — Subagent roles provenance-tracked (1, STATIC)**: every role has a `config_file`
+  (PARTIAL if only some; N/A when no roles).
+- **CDX-D9-02 — Session history persisted (1, STATIC)**: `[history].persistence` saves.
+
+**D10 — Observability (weight 2).**
+- **CDX-D10-01 — Tool calls audit-logged (1, STATIC)**: a `PostToolUse` audit hook.
+- **CDX-D10-02 — Turn completion observable (1, STATIC)**: `notify` configured (PASS) or a
+  `Stop` hook (PARTIAL).
+
+> **Static-analysis limit (Codex dispatcher pattern):** a harness that routes every hook through
+> one opaque dispatcher (e.g. `pre_tool_use_dispatch.py`) hides its security logic from
+> config-only inspection, so the needle-based checks under-credit it. This is the honest boundary
+> of static grading — explicit, conventionally-named guards grade higher because they are
+> auditable.
+
+## 7. Privacy & redaction
 
 Inputs are **read-only**; the tool never writes to the audited harness. All emitted output
-(console, JSON, HTML) redacts: absolute home paths → `~`, anything resembling a secret /
-token / key, and any email address. The report cites *what kind* of guard is present or
+(console, JSON, HTML, SARIF) redacts: absolute home paths → `~` (anywhere in the text, not just
+as a prefix), anything resembling a secret / token / key, and any email address. The report cites *what kind* of guard is present or
 missing, never the secret values a guard protects. Nothing leaves the machine.
 
-## 7. Rubric versioning
+## 8. Rubric versioning
 
 The rubric is versioned (`RUBRIC_VERSION`) and emitted in every report so a grade is
 reproducible against a known rubric. Adding/retiring checks bumps the version. Check IDs
