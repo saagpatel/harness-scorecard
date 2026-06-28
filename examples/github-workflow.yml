@@ -1,0 +1,41 @@
+# Example consumer workflow for the Harness Scorecard action.
+#
+# Copy this into your repository at .github/workflows/harness-scorecard.yml and
+# adjust `path` / `min-grade`. The job grades a coding-agent harness config
+# (Claude Code, Codex, ...) against the red-team rubric, uploads the findings to
+# GitHub code scanning as SARIF, and fails the build if the grade drops below the
+# configured bar.
+
+name: Harness Scorecard
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "0 6 * * 1" # weekly drift check, Mondays 06:00 UTC
+
+permissions:
+  contents: read
+  security-events: write # required for the SARIF upload to code scanning
+
+concurrency:
+  # Keyed on event_name so a push to main never cancels the scheduled drift check.
+  group: harness-scorecard-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name != 'schedule' }}
+
+jobs:
+  scorecard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4 # or pin to a commit SHA for supply-chain control
+
+      - name: Grade the harness
+        uses: saagpatel/harness-scorecard@v1 # or pin to a commit SHA for supply-chain control
+        with:
+          path: .claude # the harness directory to grade
+          min-grade: B # fail the build below this band (A, B, C, D, F)
+          # sarif-file: harness-scorecard.sarif   # optional, this is the default
+          # upload-sarif: "true"                   # optional, set "false" to skip code scanning
