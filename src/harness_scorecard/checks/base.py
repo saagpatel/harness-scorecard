@@ -66,21 +66,26 @@ def failed(message: str, evidence: Iterable[str] = ()) -> CheckOutcome:
 
 
 @dataclass(frozen=True, slots=True)
-class Check:
-    """A single rubric check: metadata plus an evaluation function."""
+class Check[ConfigT]:
+    """A single rubric check: metadata plus an evaluation function.
+
+    Generic over the harness config it inspects (``HarnessConfig`` for Claude Code,
+    ``CodexConfig`` for Codex) so the rubric metadata, ``run()``, and the dimension catalog
+    are shared across adapters while each check only sees the config shape it understands.
+    """
 
     id: str
     dimension: str
     title: str
     weight: int
-    evaluate: Callable[[HarnessConfig], CheckOutcome]
+    evaluate: Callable[[ConfigT], CheckOutcome]
     severity: Severity = Severity.MEDIUM
     detectability: Detectability = Detectability.STATIC
     is_gate: bool = False
     gate_cap: Grade | None = None
     remediation: str = ""
 
-    def run(self, config: HarnessConfig) -> CheckResult:
+    def run(self, config: ConfigT) -> CheckResult:
         outcome = self.evaluate(config)
         return CheckResult(
             id=self.id,

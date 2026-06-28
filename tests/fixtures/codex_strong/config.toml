@@ -1,0 +1,37 @@
+# A locked-down Codex harness: sandboxed, approval-gated, no network, env scrubbed.
+model = "gpt-5.5"
+approval_policy = "on-request"
+sandbox_mode = "workspace-write"
+web_search = "off"
+
+[sandbox_workspace_write]
+network_access = false
+writable_roots = ["/Users/example/Projects/app"]
+
+[shell_environment_policy]
+inherit = "core"
+ignore_default_excludes = false
+exclude = ["AWS_*", "*_TOKEN"]
+
+[history]
+persistence = "save-all"
+
+[agents]
+max_threads = 4
+max_depth = 1
+
+[agents.worker]
+description = "Implementation role"
+config_file = "agents/worker.toml"
+approval_policy = "on-request"
+
+[agents.explorer]
+description = "Read-only exploration role"
+config_file = "agents/explorer.toml"
+
+[mcp_servers.fetch]
+command = "uvx"
+args = ["mcp-server-fetch"]
+
+[projects."/Users/example/Projects/app"]
+trust_level = "trusted"

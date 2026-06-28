@@ -1,0 +1,18 @@
+# A wide-open Codex harness: no sandbox, no approval gate, network on, env leaked.
+model = "gpt-5.5"
+approval_policy = "never"
+sandbox_mode = "danger-full-access"
+web_search = "live"
+
+[sandbox_workspace_write]
+network_access = true
+
+[shell_environment_policy]
+inherit = "all"
+ignore_default_excludes = true
+
+[projects."/Users/example/Projects/app"]
+trust_level = "trusted"
+
+[projects."/Users/example"]
+trust_level = "trusted"

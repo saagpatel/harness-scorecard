@@ -7,8 +7,9 @@ gate wins).
 
 from __future__ import annotations
 
-from harness_scorecard.checks import ALL_CHECKS, DIMENSIONS, IMPLEMENTED_DIMENSION_IDS
-from harness_scorecard.discovery import HarnessConfig
+from typing import TYPE_CHECKING, Any, Protocol
+
+from harness_scorecard.checks import ALL_CHECKS, DIMENSIONS
 from harness_scorecard.models import (
     RUBRIC_VERSION,
     CheckResult,
@@ -18,6 +19,19 @@ from harness_scorecard.models import (
     worse_grade,
 )
 from harness_scorecard.redaction import redact_path
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+    from pathlib import Path
+
+    from harness_scorecard.checks.base import Check
+
+
+class ScorableConfig(Protocol):
+    """The minimal surface scoring needs from any harness config (Claude Code or Codex)."""
+
+    root: Path
+    harness_type: str
 
 
 def _weighted_score(checks: list[CheckResult]) -> float:
@@ -37,13 +51,24 @@ def _overall_score(dimensions: list[DimensionResult]) -> float:
     return sum(dim.weight * dim.score for dim in dimensions) / total_weight
 
 
-def score_harness(config: HarnessConfig) -> Scorecard:
-    """Grade a parsed harness config against the full rubric."""
-    results = [check.run(config) for check in ALL_CHECKS]
+def score_harness(
+    config: ScorableConfig,
+    checks: Sequence[Check[Any]] = ALL_CHECKS,
+) -> Scorecard:
+    """Grade a parsed harness config against the rubric using the given check set.
+
+    ``checks`` defaults to the Claude Code suite; the Codex adapter passes its own. Scored
+    dimensions are derived from the checks that ran, so the engine stays harness-agnostic.
+    """
+    results = [check.run(config) for check in checks]
+    implemented_ids = list(dict.fromkeys(result.dimension for result in results))
 
     dimensions: list[DimensionResult] = []
-    for dim_id in IMPLEMENTED_DIMENSION_IDS:
-        dim = DIMENSIONS[dim_id]
+    for dim_id in implemented_ids:
+        dim = DIMENSIONS.get(dim_id)
+        if dim is None:
+            msg = f"check returned dimension {dim_id!r}, which is not in the rubric catalog"
+            raise ValueError(msg)
         dim_checks = [r for r in results if r.dimension == dim_id]
         dimensions.append(
             DimensionResult(
