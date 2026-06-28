@@ -91,6 +91,30 @@ harness-scorecard scan ~/.claude --sarif harness.sarif --min-grade C
 `--min-grade {A,B,C,D,F}` sets the bar (default `B`). Exit codes: `0` meets the bar ·
 `1` below the bar · `2` no harness found.
 
+### Grade your whole machine
+
+`fleet` grades several harnesses at once and reports the distribution and the worst offender —
+no fake rolled-up letter (averaging A–F is meaningless). It's the "every agent harness on this
+box" view:
+
+```text
+$ harness-scorecard fleet ~/.claude ~/.codex
+
+Harness Scorecard  fleet  (2 harnesses)
+
+  Grades:  Ax1   Bx0   Cx0   Dx1   Fx0
+  Weakest dimension fleet-wide: D9 Memory / provenance hygiene (avg 0.62)
+  Worst offender: ~/.codex (D, 0.64)
+
+  GRADE  SCORE  TYPE         WEAKEST    HARNESS
+  A      1.00   claude-code  -          ~/.claude
+  D      0.64   codex        D9 0.25    ~/.codex
+```
+
+Pass any paths or globs (`fleet ~/.claude ~/Projects/*/.claude`); each harness is graded with
+its own auto-discovered policy. `--min-grade` (default `B`) exits non-zero if **any** harness is
+below the bar — drop it in CI to keep a whole team's harnesses above a floor.
+
 ### Track drift over time
 
 `diff` compares two scorecards and reports what changed — which checks flipped, which

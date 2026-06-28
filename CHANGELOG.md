@@ -4,6 +4,17 @@ All notable changes to Harness Scorecard are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **`fleet` command** — grade several harnesses at once and report the grade distribution, the
+  weakest dimension *across the whole fleet*, and the worst offender. Pass paths or globs
+  (`fleet ~/.claude ~/Projects/*/.claude`); each is graded with its own auto-discovered policy.
+  No rolled-up letter grade (averaging A–F is meaningless) — the distribution and the floor are
+  shown instead. Console + JSON; `--min-grade` exits non-zero if any harness is below the bar; a
+  path that isn't a harness is skipped with a note, never aborting the run.
+
 ## [1.2.0] - 2026-06-28
 
 ### Added

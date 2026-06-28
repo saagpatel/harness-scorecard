@@ -15,6 +15,12 @@ from typing import TYPE_CHECKING
 
 from harness_scorecard.diff import diff_scorecards, render_diff_console, render_diff_json
 from harness_scorecard.dispatch import HARNESS_TYPES, select_adapter
+from harness_scorecard.fleet import (
+    FleetError,
+    FleetReport,
+    render_fleet_console,
+    render_fleet_json,
+)
 from harness_scorecard.htmlreport import render_html
 from harness_scorecard.models import RUBRIC_VERSION, Grade, grade_rank
 from harness_scorecard.policy import EMPTY_POLICY, POLICY_FILENAME, find_policy, load_policy
@@ -111,6 +117,35 @@ def _build_parser() -> argparse.ArgumentParser:
         default="console",
         help="Output format for stdout (default: console).",
     )
+
+    fleet = sub.add_parser(
+        "fleet",
+        help="Grade several harnesses at once and report the distribution + worst offender.",
+    )
+    fleet.add_argument(
+        "paths",
+        nargs="+",
+        help="Harness directories to grade (globs welcome, e.g. ~/.claude ~/Projects/*/.claude).",
+    )
+    fleet.add_argument(
+        "--type",
+        dest="harness_type",
+        choices=list(HARNESS_TYPES),
+        default="auto",
+        help="Harness type for every path (default: auto-detect per path).",
+    )
+    fleet.add_argument(
+        "--format",
+        choices=["console", "json"],
+        default="console",
+        help="Output format for stdout (default: console).",
+    )
+    fleet.add_argument(
+        "--min-grade",
+        choices=[grade.value for grade in Grade],
+        default=Grade.B.value,
+        help="Exit non-zero if any graded harness is below this band (default: B).",
+    )
     return parser
 
 
@@ -168,6 +203,31 @@ def _run_diff(args: argparse.Namespace) -> int:
     return 1 if diff.grade_regressed else 0
 
 
+def _run_fleet(args: argparse.Namespace) -> int:
+    cards: list[Scorecard] = []
+    errors: list[FleetError] = []
+    for raw_path in args.paths:
+        path = Path(raw_path).expanduser()
+        try:
+            config, checks = select_adapter(path, args.harness_type)
+            cards.append(score_harness(config, checks, _resolve_policy(path, None)))
+        except (OSError, ValueError) as exc:
+            errors.append(FleetError(path=str(path), message=str(exc)))
+
+    if not cards:
+        print("error: no gradable harness found in the given paths", file=sys.stderr)
+        for err in errors:
+            print(f"  - {redact_text(err.path)}: {redact_text(err.message)}", file=sys.stderr)
+        return 2
+
+    report = FleetReport(cards=cards, errors=errors)
+    output = render_fleet_json(report) if args.format == "json" else render_fleet_console(report)
+    print(output)
+
+    bar = grade_rank(Grade(args.min_grade))
+    return 1 if any(grade_rank(card.grade) < bar for card in cards) else 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = _build_parser()
     args = parser.parse_args(argv)
@@ -175,6 +235,8 @@ def main(argv: list[str] | None = None) -> int:
         return _run_scan(args)
     if args.command == "diff":
         return _run_diff(args)
+    if args.command == "fleet":
+        return _run_fleet(args)
     parser.print_help()
     return 2
 
