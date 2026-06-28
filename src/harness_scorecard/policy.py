@@ -80,7 +80,13 @@ def _parse_credits(raw: Any) -> list[str]:
     if not isinstance(credit_ids, list):
         msg = "[dispatcher].credits must be a list of check ids"
         raise ValueError(msg)
-    return [str(item) for item in credit_ids]
+    validated: list[str] = []
+    for item in credit_ids:
+        if not isinstance(item, str) or not item:
+            msg = "[dispatcher].credits entries must be non-empty check-id strings"
+            raise ValueError(msg)
+        validated.append(item)
+    return validated
 
 
 def load_policy(path: Path) -> Policy:

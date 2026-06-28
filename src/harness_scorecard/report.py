@@ -51,7 +51,13 @@ def _waived_checks(card: Scorecard) -> list[CheckResult]:
 
 
 def _credited_checks(card: Scorecard) -> list[CheckResult]:
-    return [check for dim in card.dimensions for check in dim.checks if check.dispatcher_credited]
+    # A waived check's credit is moot (it's excluded anyway), so it counts only as waived.
+    return [
+        check
+        for dim in card.dimensions
+        for check in dim.checks
+        if check.dispatcher_credited and not check.waived
+    ]
 
 
 def _policy_summary_lines(card: Scorecard) -> list[str]:
@@ -103,7 +109,11 @@ def render_console(card: Scorecard) -> str:
     out.extend(_policy_summary_lines(card))
 
     for dim in card.dimensions:
-        out.append(f"  {dim.id}  {dim.name}    {dim.score:.2f}  [weight {dim.weight}]")
+        # Distinguish a dimension excluded by waivers from one that genuinely scored 0.00.
+        counting = [c for c in dim.checks if not c.waived and c.status.score is not None]
+        all_waived = not counting and any(c.waived for c in dim.checks)
+        excluded = "  (excluded: all findings waived)" if all_waived else ""
+        out.append(f"  {dim.id}  {dim.name}    {dim.score:.2f}  [weight {dim.weight}]{excluded}")
         for check in dim.checks:
             out.extend(_check_line(check))
         out.append("")

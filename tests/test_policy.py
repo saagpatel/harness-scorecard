@@ -77,6 +77,10 @@ class TestPolicyParsing(unittest.TestCase):
         with self.assertRaises(ValueError):
             load_policy(self._write('[[waiver]]\nreason = "no check id"\n'))
 
+    def test_non_string_credit_raises(self) -> None:
+        with self.assertRaises(ValueError):
+            load_policy(self._write("[dispatcher]\ncredits = [1, 2]\n"))
+
     def test_find_policy_discovers_in_root(self) -> None:
         path = self._write("")
         self.assertEqual(find_policy(path.parent), path)
@@ -115,6 +119,21 @@ class TestWaiverApplication(unittest.TestCase):
         self.assertTrue(any("unnecessary" in n for n in notes))
         self.assertTrue(any("unknown check HS-D9-99" in n for n in notes))
 
+    def test_waiving_na_check_is_noted_not_applied(self) -> None:
+        results = [_check("HS-D7-01", "D7", Status.NOT_APPLICABLE)]
+        notes = _apply_policy(results, Policy(waivers=(Waiver("HS-D7-01", "n/a anyway"),)))
+        self.assertFalse(results[0].waived)  # N/A is already excluded; waiver is a no-op
+        self.assertTrue(any("not applicable" in n for n in notes))
+
+    def test_credit_then_waiver_on_same_id_notes_override_and_counts_once(self) -> None:
+        results = [_check("HS-D4-03", "D4", Status.FAIL)]
+        notes = _apply_policy(
+            results,
+            Policy(waivers=(Waiver("HS-D4-03", "accepted"),), dispatcher_credits=("HS-D4-03",)),
+        )
+        self.assertTrue(results[0].waived)
+        self.assertTrue(any("overridden by a waiver" in n for n in notes))
+
 
 class TestDispatcherCredit(unittest.TestCase):
     def test_credit_upgrades_fail_to_partial(self) -> None:
@@ -128,7 +147,7 @@ class TestDispatcherCredit(unittest.TestCase):
         notes = _apply_policy(results, Policy(dispatcher_credits=("HS-D4-01",)))
         self.assertEqual(results[0].status, Status.PASS)
         self.assertFalse(results[0].dispatcher_credited)
-        self.assertTrue(any("did not fail" in n for n in notes))
+        self.assertTrue(any("not failing" in n for n in notes))
 
     def test_credited_gate_no_longer_caps(self) -> None:
         config = _FakeConfig()

@@ -127,7 +127,7 @@ def _run_scan(args: argparse.Namespace) -> int:
     try:
         config, checks = select_adapter(root, args.harness_type)
         policy = _resolve_policy(root, args.policy_path)
-    except (FileNotFoundError, ValueError) as exc:
+    except (OSError, ValueError) as exc:
         print(f"error: {redact_text(str(exc))}", file=sys.stderr)
         return 2
 
@@ -158,7 +158,7 @@ def _run_diff(args: argparse.Namespace) -> int:
     try:
         old = _resolve_scorecard(args.baseline, args.harness_type)
         new = _resolve_scorecard(args.current, args.harness_type)
-    except (FileNotFoundError, ValueError, json.JSONDecodeError) as exc:
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
         print(f"error: {redact_text(str(exc))}", file=sys.stderr)
         return 2
 

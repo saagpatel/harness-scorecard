@@ -92,14 +92,20 @@ def _apply_policy(results: list[CheckResult], policy: Policy) -> list[str]:
             result.status = Status.PARTIAL
             result.dispatcher_credited = True
         else:
-            notes.append(f"dispatcher credit for {check_id} is unnecessary (check did not fail)")
+            notes.append(
+                f"dispatcher credit for {check_id} is unnecessary (the check is not failing)"
+            )
     for check_id, reason in policy.waiver_map.items():
         result = by_id.get(check_id)
         if result is None:
             notes.append(f"waiver for unknown check {check_id} (ignored)")
         elif result.status is Status.PASS:
             notes.append(f"waiver for {check_id} is unnecessary (check passes)")
+        elif result.status is Status.NOT_APPLICABLE:
+            notes.append(f"waiver for {check_id} is unnecessary (check is not applicable)")
         else:
+            if result.dispatcher_credited:
+                notes.append(f"dispatcher credit for {check_id} was overridden by a waiver")
             result.waived = True
             result.waiver_reason = reason
     return notes
