@@ -12,12 +12,10 @@ from pathlib import Path
 
 from harness_scorecard.discovery import load_harness
 from harness_scorecard.htmlreport import render_html
-from harness_scorecard.models import RUBRIC_VERSION, Grade
+from harness_scorecard.models import RUBRIC_VERSION, Grade, grade_rank
 from harness_scorecard.report import render_console, render_json
 from harness_scorecard.sarif import render_sarif
 from harness_scorecard.scoring import score_harness
-
-_HEALTHY_GRADES = (Grade.A, Grade.B)
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -56,6 +54,12 @@ def _build_parser() -> argparse.ArgumentParser:
         metavar="FILE",
         help="Also write a SARIF 2.1.0 report to FILE (for CI / code scanning).",
     )
+    scan.add_argument(
+        "--min-grade",
+        choices=[grade.value for grade in Grade],
+        default=Grade.B.value,
+        help="Exit non-zero when the harness grades below this band (default: B).",
+    )
     return parser
 
 
@@ -78,7 +82,7 @@ def _run_scan(args: argparse.Namespace) -> int:
     if args.sarif_out:
         Path(args.sarif_out).expanduser().write_text(render_sarif(card), encoding="utf-8")
 
-    return 0 if card.grade in _HEALTHY_GRADES else 1
+    return 0 if grade_rank(card.grade) >= grade_rank(Grade(args.min_grade)) else 1
 
 
 def main(argv: list[str] | None = None) -> int:

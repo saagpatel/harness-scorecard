@@ -42,5 +42,25 @@ class TestScanCommand(unittest.TestCase):
         self.assertEqual(payload["dimensions_scored"], 10)
 
 
+class TestMinGradeGate(unittest.TestCase):
+    def test_min_grade_f_passes_a_failing_harness(self):
+        # Loosening the bar to F means even the weak harness clears the gate.
+        code, _ = run_cli(["scan", str(FIXTURES / "weak_harness"), "--min-grade", "F"])
+        self.assertEqual(code, 0)
+
+    def test_min_grade_a_still_passes_the_strong_harness(self):
+        code, _ = run_cli(["scan", str(FIXTURES / "strong_harness"), "--min-grade", "A"])
+        self.assertEqual(code, 0)
+
+    def test_default_bar_is_b_so_weak_harness_fails(self):
+        code, _ = run_cli(["scan", str(FIXTURES / "weak_harness")])
+        self.assertEqual(code, 1)
+
+    def test_invalid_min_grade_is_rejected(self):
+        with self.assertRaises(SystemExit) as ctx:
+            run_cli(["scan", str(FIXTURES / "strong_harness"), "--min-grade", "Z"])
+        self.assertEqual(ctx.exception.code, 2)
+
+
 if __name__ == "__main__":
     unittest.main()
