@@ -1,9 +1,10 @@
 # Harness Scorecard
 
 A read-only linter and **A–F maturity grader for coding-agent harnesses**. Point it at a
-Claude Code (or, soon, Codex) setup — its hooks, `permissions` lists, `rules/*.md`, agents,
-skills, and `CLAUDE.md` — and it returns a graded scorecard: the overall maturity grade, the
-specific gaps, and the guards that are missing, each with rationale.
+Claude Code or Codex setup — Claude Code's hooks, `permissions`, `rules/*.md`, agents, and
+`CLAUDE.md`, or Codex's `config.toml` (sandbox, approval policy, trust levels), `hooks.json`,
+and `AGENTS.md` — and it returns a graded scorecard: the overall maturity grade, the specific
+gaps, and the guards that are missing, each with rationale. The harness type is auto-detected.
 
 "Harness engineering" became a named discipline in 2026 and everyone is assembling harnesses
 with no way to tell if theirs is any good. The rubric is the product: every check traces to a
@@ -63,12 +64,14 @@ weekly scheduling, SARIF upload — is in [`examples/github-workflow.yml`](examp
 
 ## Scope (v1)
 
-Implements **all ten rubric dimensions** end-to-end for Claude Code harnesses: secret
+Implements **all ten rubric dimensions** end-to-end for **both Claude Code and Codex**: secret
 protection, egress/exfiltration control, tool-surface & inbound-injection defense,
 destructive-action & git safety, harness self-protection & integrity, verification gates,
 subagent isolation & governance, recovery/rollback safety, memory/provenance hygiene, and
-observability/audit trail (the critical gated trio is D1/D4/D5). Codex support is next. The
-rubric is versioned and emitted in every report.
+observability/audit trail (the critical gated trio is D1/D4/D5). Each harness has its own
+adapter and check suite over the shared scoring engine; the bypass-aware effective floor maps
+to Codex's `sandbox_mode = "danger-full-access"` + `approval_policy = "never"` just as it does
+to Claude Code's `bypassPermissions`. The rubric is versioned and emitted in every report.
 
 ## Development
 
