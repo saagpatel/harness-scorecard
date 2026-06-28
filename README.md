@@ -39,6 +39,25 @@ harness-scorecard scan ~/.claude --sarif harness.sarif --min-grade C
 `--min-grade {A,B,C,D,F}` sets the bar (default `B`). Exit codes: `0` meets the bar ·
 `1` below the bar · `2` no harness found.
 
+### Track drift over time
+
+`diff` compares two scorecards and reports what changed — which checks flipped, which
+dimension scores moved, and whether a capability gate newly trips. Each argument is either a
+live harness directory or a saved JSON report (`scan --json`), so the same command covers a CI
+regression gate, a before/after audit, or drift between two snapshots:
+
+```bash
+# Record a baseline, then later fail if the harness grade regresses below it
+harness-scorecard scan ~/.claude --json baseline.json
+harness-scorecard diff baseline.json ~/.claude          # exit 1 if the grade dropped
+
+# Compare two saved snapshots, machine-readable
+harness-scorecard diff old.json new.json --format json
+```
+
+Exit codes: `0` no regression (same or better grade) · `1` grade regressed · `2` invalid input.
+Gate and dimension moves are reported for context; the **letter grade** is what fails the gate.
+
 ## GitHub Action
 
 Grade your harness in CI and upload the findings to code scanning:
@@ -51,8 +70,19 @@ Grade your harness in CI and upload the findings to code scanning:
 ```
 
 The action writes SARIF and uploads it (requires `security-events: write`) **even when the grade
-fails the build**, so findings always reach code scanning. A complete workflow — permissions,
-weekly scheduling, SARIF upload — is in [`examples/github-workflow.yml`](examples/github-workflow.yml).
+fails the build**, so findings always reach code scanning. Commit a `baseline.json` and pass
+`baseline:` to also fail the job on any grade regression — a PR that weakens the harness can't
+merge:
+
+```yaml
+- uses: saagpatel/harness-scorecard@v1
+  with:
+    path: .claude
+    baseline: .github/harness-baseline.json   # fail if the grade drops below this
+```
+
+A complete workflow — permissions, weekly scheduling, SARIF upload — is in
+[`examples/github-workflow.yml`](examples/github-workflow.yml).
 
 ## Guarantees
 

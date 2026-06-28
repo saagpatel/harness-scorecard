@@ -4,6 +4,21 @@ All notable changes to Harness Scorecard are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **`diff` mode** — `harness-scorecard diff <baseline> <current>` compares two scorecards and
+  reports what changed: which checks flipped, which dimension scores moved, and whether a
+  capability gate newly trips. Each argument is either a live harness directory or a saved JSON
+  report (`scan --json`), so one command covers a CI regression gate, a before/after audit, and
+  drift between snapshots. Exit codes: `0` no regression · `1` grade regressed · `2` invalid
+  input. Console and JSON output, both fully redacted.
+- **GitHub Action `baseline` input** — point it at a committed JSON scorecard and the action
+  fails the job on any grade regression, so a PR that weakens the harness can't merge.
+- **`report.from_dict()`** — reconstructs a `Scorecard` from a saved JSON report (the inverse of
+  `to_dict()`), with a clear `ValueError` on malformed input.
+
 ## [1.0.1] - 2026-06-27
 
 Patch release: hardening and consistency fixes from a full-codebase audit. No change to

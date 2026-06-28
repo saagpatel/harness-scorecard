@@ -6,7 +6,15 @@ import json
 from typing import Any
 
 from harness_scorecard.checks import DIMENSIONS
-from harness_scorecard.models import CheckResult, Scorecard, Status
+from harness_scorecard.models import (
+    CheckResult,
+    Detectability,
+    DimensionResult,
+    Grade,
+    Scorecard,
+    Severity,
+    Status,
+)
 from harness_scorecard.redaction import redact_text
 
 _STATUS_TAG = {
@@ -112,3 +120,59 @@ def to_dict(card: Scorecard) -> dict[str, Any]:
 
 def render_json(card: Scorecard) -> str:
     return json.dumps(to_dict(card), indent=2)
+
+
+def _check_from_dict(data: dict[str, Any], dimension_id: str) -> CheckResult:
+    gate_cap = data.get("gate_cap")
+    return CheckResult(
+        id=data["id"],
+        dimension=dimension_id,
+        title=data["title"],
+        status=Status(data["status"]),
+        weight=data["weight"],
+        message=data.get("message", ""),
+        severity=Severity(data.get("severity", Severity.MEDIUM.value)),
+        detectability=Detectability(data.get("detectability", Detectability.STATIC.value)),
+        is_gate=data.get("is_gate", False),
+        gate_cap=Grade(gate_cap) if gate_cap else None,
+        remediation=data.get("remediation", ""),
+        evidence=list(data.get("evidence", [])),
+    )
+
+
+def from_dict(data: dict[str, Any]) -> Scorecard:
+    """Reconstruct a :class:`Scorecard` from a saved JSON report (the inverse of :func:`to_dict`).
+
+    Gate caps are recomputed from the reconstructed checks rather than read back from the
+    report's summary list, so the tripped-gate set has a single source of truth. Raises
+    ``ValueError`` if ``data`` is not a recognizable harness-scorecard report.
+    """
+    if not isinstance(data, dict) or "dimensions" not in data or "grade" not in data:
+        msg = "not a harness-scorecard JSON report (missing 'dimensions'/'grade')"
+        raise ValueError(msg)
+    try:
+        dimensions = [
+            DimensionResult(
+                id=dim["id"],
+                name=dim["name"],
+                weight=dim["weight"],
+                score=dim["score"],
+                checks=[_check_from_dict(c, dim["id"]) for c in dim["checks"]],
+            )
+            for dim in data["dimensions"]
+        ]
+        gate_caps = [
+            c for dim in dimensions for c in dim.checks if c.triggered_gate_cap is not None
+        ]
+        return Scorecard(
+            harness_path=data["harness_path"],
+            harness_type=data["harness_type"],
+            rubric_version=data["rubric_version"],
+            overall_score=data["overall_score"],
+            grade=Grade(data["grade"]),
+            dimensions=dimensions,
+            gate_caps=gate_caps,
+        )
+    except (KeyError, TypeError) as exc:
+        msg = f"malformed harness-scorecard JSON report: missing or invalid field {exc}"
+        raise ValueError(msg) from exc

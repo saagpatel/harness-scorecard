@@ -17,6 +17,12 @@ inputs:
     description: Fail the job when the harness grades below this band (A, B, C, D, or F).
     required: false
     default: B
+  baseline:
+    description: >-
+      Optional path to a previously saved JSON scorecard (produced by `scan --json`).
+      When set, the action also fails the job if the current grade regresses below it.
+    required: false
+    default: ""
   upload-sarif:
     description: Upload the SARIF report to GitHub code scanning (requires security-events:write).
     required: false
@@ -29,6 +35,9 @@ outputs:
   exit-code:
     description: Raw scan exit code (0 = meets bar, 1 = below bar, 2 = no harness found).
     value: ${{ steps.scan.outputs.exit-code }}
+  diff-exit-code:
+    description: Raw diff exit code when a baseline is set (0 = no regression, 1 = regressed, 2 = invalid input).
+    value: ${{ steps.diff.outputs.diff-exit-code }}
 
 runs:
   using: composite
@@ -66,13 +75,29 @@ runs:
       with:
         sarif_file: ${{ inputs.sarif-file }}
 
+    - name: Check for grade regression vs baseline
+      id: diff
+      if: ${{ inputs.baseline != '' }}
+      shell: bash
+      env:
+        HS_BASELINE: ${{ inputs.baseline }}
+        HS_PATH: ${{ inputs.path }}
+      run: |
+        set +e
+        harness-scorecard diff "$HS_BASELINE" "$HS_PATH"
+        code=$?
+        echo "diff-exit-code=${code}" >> "$GITHUB_OUTPUT"
+        exit 0
+
     - name: Enforce grade and input validity
       if: ${{ always() }}
       shell: bash
       env:
         SCAN_CODE: ${{ steps.scan.outputs.exit-code }}
+        DIFF_CODE: ${{ steps.diff.outputs.diff-exit-code }}
         HS_PATH: ${{ inputs.path }}
         HS_MIN_GRADE: ${{ inputs.min-grade }}
+        HS_BASELINE: ${{ inputs.baseline }}
       run: |
         if [ -z "$SCAN_CODE" ]; then
           echo "::error::Scan step produced no exit code; harness-scorecard setup likely failed."
@@ -87,5 +112,22 @@ runs:
           echo "::error::Harness graded below the required minimum grade."
           printf 'minimum grade: %s\n' "$HS_MIN_GRADE"
           exit 1
+        fi
+        if [ -n "$HS_BASELINE" ]; then
+          if [ -z "$DIFF_CODE" ]; then
+            echo "::error::Baseline comparison produced no exit code; the diff step failed."
+            exit 1
+          fi
+          if [ "$DIFF_CODE" = "2" ]; then
+            echo "::error::harness-scorecard diff could not read the baseline or current harness."
+            printf 'baseline: %s\n' "$HS_BASELINE"
+            exit 1
+          fi
+          if [ "$DIFF_CODE" = "1" ]; then
+            echo "::error::Harness grade regressed below the committed baseline."
+            printf 'baseline: %s\n' "$HS_BASELINE"
+            exit 1
+          fi
+          printf 'No grade regression vs baseline (%s).\n' "$HS_BASELINE"
         fi
         printf 'Harness meets the minimum grade (%s).\n' "$HS_MIN_GRADE"
