@@ -5,7 +5,9 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from harness_scorecard.checks import ALL_CHECKS
 from harness_scorecard.checks_codex import CODEX_CHECKS
+from harness_scorecard.discovery import load_harness
 from harness_scorecard.discovery_codex import load_codex_harness
 from harness_scorecard.introspect import Evidence, detect_evidence
 from harness_scorecard.models import CheckResult, Grade, Status
@@ -71,7 +73,7 @@ class TestDetectEvidence(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = self._harness(tmp)
             hooks = [_hook("PreToolUse", "python3 hooks/pre_tool_use_dispatch.py")]
-            found = detect_evidence(root, hooks)
+            found = detect_evidence(root, hooks, CODEX_CHECKS)
         # D4-02 (force-push) + D5-03 (self-write regex) from the dispatcher; D10-01 from common.py.
         self.assertEqual({"CDX-D4-02", "CDX-D5-03", "CDX-D10-01"}, set(found))
         self.assertIn("common.py", found["CDX-D10-01"].location)
@@ -85,7 +87,9 @@ class TestDetectEvidence(unittest.TestCase):
                 "# we should call injection_signals(prompt) someday\nx = 1\n", encoding="utf-8"
             )
             found = detect_evidence(
-                root, [_hook("PreToolUse", "python3 hooks/pre_tool_use_dispatch.py")]
+                root,
+                [_hook("PreToolUse", "python3 hooks/pre_tool_use_dispatch.py")],
+                CODEX_CHECKS,
             )
         self.assertNotIn("CDX-D3-02", found)
 
@@ -97,7 +101,9 @@ class TestDetectEvidence(unittest.TestCase):
                 _PROMPT_DISPATCH, encoding="utf-8"
             )
             found = detect_evidence(
-                root, [_hook("UserPromptSubmit", "python3 hooks/user_prompt_submit_dispatch.py")]
+                root,
+                [_hook("UserPromptSubmit", "python3 hooks/user_prompt_submit_dispatch.py")],
+                CODEX_CHECKS,
             )
         self.assertIn("CDX-D3-02", found)
 
@@ -105,7 +111,9 @@ class TestDetectEvidence(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = self._harness(tmp)
             # A named guard (no dispatch idiom) is not introspected, even with guards on disk.
-            found = detect_evidence(root, [_hook("PreToolUse", "bash hooks/git-safety.sh")])
+            found = detect_evidence(
+                root, [_hook("PreToolUse", "bash hooks/git-safety.sh")], CODEX_CHECKS
+            )
         self.assertEqual(found, {})
 
     def test_path_traversal_token_cannot_escape_root(self) -> None:
@@ -113,7 +121,7 @@ class TestDetectEvidence(unittest.TestCase):
             root = self._harness(tmp)
             # A "../.." token resolves outside the harness root and must be ignored, not read.
             hooks = [_hook("PreToolUse", "python3 hooks/../../pre_tool_use_dispatch.py")]
-            found = detect_evidence(root, hooks)
+            found = detect_evidence(root, hooks, CODEX_CHECKS)
         self.assertEqual(found, {})
 
     def test_lifecycle_event_dispatcher_is_not_scanned(self) -> None:
@@ -121,7 +129,9 @@ class TestDetectEvidence(unittest.TestCase):
             root = self._harness(tmp)
             # A dispatcher on SessionStart routes lifecycle chores, not tool guards -> no evidence.
             found = detect_evidence(
-                root, [_hook("SessionStart", "python3 hooks/pre_tool_use_dispatch.py")]
+                root,
+                [_hook("SessionStart", "python3 hooks/pre_tool_use_dispatch.py")],
+                CODEX_CHECKS,
             )
         self.assertEqual(found, {})
 
@@ -134,7 +144,9 @@ class TestDetectEvidence(unittest.TestCase):
                 encoding="utf-8",
             )
             found = detect_evidence(
-                root, [_hook("PreToolUse", "python3 hooks/pre_tool_use_dispatch.py")]
+                root,
+                [_hook("PreToolUse", "python3 hooks/pre_tool_use_dispatch.py")],
+                CODEX_CHECKS,
             )
         self.assertNotIn("CDX-D4-02", found)
 
@@ -234,7 +246,7 @@ class TestEndToEndCreditDetected(unittest.TestCase):
                 encoding="utf-8",
             )
             config = load_codex_harness(root)
-            detected = detect_evidence(root, config.hooks)
+            detected = detect_evidence(root, config.hooks, CODEX_CHECKS)
             self.assertIn("CDX-D5-03", detected)
 
             suggested = score_harness(config, CODEX_CHECKS, detected=detected)
@@ -248,6 +260,55 @@ class TestEndToEndCreditDetected(unittest.TestCase):
         self.assertIs(by_id_credited["CDX-D5-03"].status, Status.PARTIAL)
         self.assertEqual(by_id_credited["CDX-D5-03"].credit_source, "detected")
         self.assertIn("(dispatcher-detected)", render_console(credited))
+
+
+class TestClaudeCoverage(unittest.TestCase):
+    """Introspection covers Claude (HS-*) checks via their dispatcher_evidence, not only Codex."""
+
+    _GUARD = (
+        "import re\n\n\n"
+        "def analyze(command):\n"
+        '    if re.search(r"git push --force", command):\n'
+        '        return "deny", "force-push blocked"\n'
+        '    return "allow", ""\n'
+    )
+
+    def test_credit_detected_lifts_a_failing_claude_check(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "hooks").mkdir()
+            (root / "hooks" / "pre_tool_use_dispatch.py").write_text(self._GUARD, encoding="utf-8")
+            (root / "settings.json").write_text(
+                json.dumps(
+                    {
+                        "permissions": {"defaultMode": "default"},
+                        "hooks": {
+                            "PreToolUse": [
+                                {
+                                    "matcher": "Bash",
+                                    "hooks": [
+                                        {"command": "python3 hooks/pre_tool_use_dispatch.py"}
+                                    ],
+                                }
+                            ]
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+            config = load_harness(root)
+            detected = detect_evidence(root, config.hooks, ALL_CHECKS)
+            self.assertIn("HS-D4-05", detected)  # force-push policy, found behind the dispatcher
+            suggested = score_harness(config, ALL_CHECKS, detected=detected)
+            credited = score_harness(config, ALL_CHECKS, detected=detected, credit_detected=True)
+
+        suggested_by_id = {c.id: c for dim in suggested.dimensions for c in dim.checks}
+        self.assertIs(suggested_by_id["HS-D4-05"].status, Status.FAIL)  # suggested, not credited
+        self.assertTrue(any("HS-D4-05" in note for note in suggested.policy_notes))
+
+        by_id = {c.id: c for dim in credited.dimensions for c in dim.checks}
+        self.assertIs(by_id["HS-D4-05"].status, Status.PARTIAL)
+        self.assertEqual(by_id["HS-D4-05"].credit_source, "detected")
 
 
 if __name__ == "__main__":

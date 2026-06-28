@@ -70,5 +70,10 @@ CHECKS: list[Check[CodexConfig]] = [
             "Add a UserPromptSubmit hook (or a content-sanitization PreToolUse hook) to screen "
             "inbound prompts and tool output for prompt-injection."
         ),
+        dispatcher_evidence=(
+            r"\binjection_signals\s*\(",
+            r"\bINJECTION_RE\b",
+            r"\bINJECTION_PATTERNS\b",
+        ),
     ),
 ]

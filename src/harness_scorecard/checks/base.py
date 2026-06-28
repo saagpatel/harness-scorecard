@@ -89,6 +89,10 @@ class Check[ConfigT]:
     is_gate: bool = False
     gate_cap: Grade | None = None
     remediation: str = ""
+    # Dispatcher introspection (see harness_scorecard.introspect): regex code-signatures whose
+    # presence in an opaque dispatcher's source evidences this check's guard. Empty unless the
+    # guard can be routed through a dispatcher that name-based detection would miss.
+    dispatcher_evidence: tuple[str, ...] = ()
 
     def run(self, config: ConfigT) -> CheckResult:
         outcome = self.evaluate(config)

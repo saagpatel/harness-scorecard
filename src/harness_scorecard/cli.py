@@ -218,7 +218,7 @@ def _run_scan(args: argparse.Namespace) -> int:
         return 2
 
     hooks = getattr(config, "hooks", None) or []
-    detected = detect_evidence(root, hooks) if hooks else {}
+    detected = detect_evidence(root, hooks, checks) if hooks else {}
     card = score_harness(
         config, checks, policy, detected=detected, credit_detected=args.credit_detected
     )

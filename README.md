@@ -252,7 +252,9 @@ $ harness-scorecard scan ~/.codex --credit-detected
 A source match is *evidence, not proof*, so detection stays conservative: suggest-only by default,
 comment and docstring mentions are ignored, scanned paths are confined to the harness directory,
 and a capability gate is never auto-credited — lifting a grade floor still requires a verified
-manifest entry.
+manifest entry. Each check carries its own guard signature (a `dispatcher_evidence` field), so
+introspection covers both Claude (`HS-*`) and Codex (`CDX-*`) checks and a new check is picked up
+the moment it declares one.
 
 ## GitHub Action
 

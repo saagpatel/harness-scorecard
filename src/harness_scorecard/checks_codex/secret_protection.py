@@ -84,6 +84,11 @@ CHECKS: list[Check[CodexConfig]] = [
             "Add a PreToolUse hook that blocks reading ~/.ssh, ~/.aws, ~/.gnupg, and similar "
             "credential paths (the sandbox alone does not stop reads)."
         ),
+        dispatcher_evidence=(
+            r"\bSENSITIVE_PATH_RE\b",
+            r"home-level credential",
+            r"\.ssh\b.{0,40}\.aws\b",
+        ),
     ),
     Check(
         id="CDX-D1-03",

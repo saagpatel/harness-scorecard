@@ -6,15 +6,16 @@ named-guard needles miss and the scorer emits an opaque-dispatcher caveat (see
 :mod:`harness_scorecard.caveats`). The operator's recourse today is to hand-read the dispatcher
 and declare ``[dispatcher].credits`` in a policy file.
 
-This module does that reading automatically: it scans the dispatcher source (and the sibling
-modules beside it, where shared guard logic lives) for a per-check *code construct* -- a named
-guard regex, a guard call -- whose presence indicates the guard is implemented. A match is
-**evidence, not proof**: source scanning can be fooled, so detection is advisory by default
+This module does that reading automatically: each :class:`~harness_scorecard.checks.base.Check`
+declares its own ``dispatcher_evidence`` signature (so the evidence lives with the check, not in a
+separate table that can drift), and this module scans the dispatcher source (and the sibling
+modules beside it, where shared guard logic lives) for those code constructs -- a named guard
+regex, a guard call -- whose presence indicates the guard is implemented. A match is **evidence,
+not proof**: source scanning can be fooled, so detection is advisory by default
 (:func:`harness_scorecard.scoring.score_harness` turns a find into a *suggestion* to add the
 check to ``[dispatcher].credits``) and only credits the finding when the operator opts in with
-``--credit-detected``. Patterns target identifiers / calls / named regexes (not prose), and
-comment lines and triple-quoted blocks are skipped to suppress docstring mentions -- but a
-match is evidence, not proof, which is why detection only *suggests* by default.
+``--credit-detected``. Evidence patterns should target identifiers / calls / named regexes (not
+prose); comment lines and triple-quoted blocks are skipped to suppress docstring mentions.
 """
 
 from __future__ import annotations
@@ -22,38 +23,15 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from harness_scorecard.caveats import _SCRIPT_RE, _SECURITY_EVENTS, is_dispatcher_command
 
 if TYPE_CHECKING:
     from collections.abc import Iterator, Sequence
 
+    from harness_scorecard.checks.base import Check
     from harness_scorecard.parsing import HookEntry
-
-# Per-check evidence: a code construct whose presence in the dispatcher source indicates the
-# guard exists. Each pattern targets a named regex/constant or a call so a comment or a passing
-# string mention is unlikely to match; comment and docstring lines are skipped during the scan.
-EVIDENCE_PATTERNS: dict[str, tuple[str, ...]] = {
-    "CDX-D1-02": (r"\bSENSITIVE_PATH_RE\b", r"home-level credential", r"\.ssh\b.{0,40}\.aws\b"),
-    "CDX-D3-02": (r"\binjection_signals\s*\(", r"\bINJECTION_RE\b", r"\bINJECTION_PATTERNS\b"),
-    "CDX-D4-02": (
-        r"force[_\s-]?push",
-        r"git\s+push\b[^\n]*--force",
-        r"git\s+(?:reset|rebase|filter-branch|filter-repo)\b",
-    ),
-    "CDX-D5-03": (
-        r"\bCODEX_SELF_WRITE_RE\b",
-        r"self[_\s-]?protect",
-        r"\.codex/(?:hooks|agents|config)",
-    ),
-    "CDX-D6-01": (
-        r"\bvalidate_closeout_claims\s*\(",
-        r"\bcheck_codex_config_surfaces\s*\(",
-        r"\bsafe_verification\s*\(",
-    ),
-    "CDX-D10-01": (r"\bHOOK_AUDIT_LOG\b", r"\baudit\.jsonl\b", r"\bappend_audit\s*\("),
-}
 
 
 @dataclass(frozen=True, slots=True)
@@ -152,17 +130,24 @@ def _code_lines(lines: list[str]) -> Iterator[tuple[int, str]]:
             yield lineno, code
 
 
-def detect_evidence(root: Path, hooks: Sequence[HookEntry]) -> dict[str, Evidence]:
+def detect_evidence(
+    root: Path, hooks: Sequence[HookEntry], checks: Sequence[Check[Any]]
+) -> dict[str, Evidence]:
     """First evidence snippet per check whose guard is found in the dispatcher source bundle.
 
+    Evidence patterns are read from each check's ``dispatcher_evidence`` (checks with none are
+    skipped), so the signatures live with the checks and a new check is covered automatically.
     Read-only and best-effort: unreadable files are skipped, comment and docstring lines are
     ignored, and at most one :class:`Evidence` is returned per check id (the first match across
     the bundle).
     """
     compiled = {
-        check_id: [re.compile(pattern, re.IGNORECASE) for pattern in patterns]
-        for check_id, patterns in EVIDENCE_PATTERNS.items()
+        check.id: [re.compile(pattern, re.IGNORECASE) for pattern in check.dispatcher_evidence]
+        for check in checks
+        if check.dispatcher_evidence
     }
+    if not compiled:
+        return {}
     found: dict[str, Evidence] = {}
     for path in _dispatcher_sources(root, hooks):
         try:

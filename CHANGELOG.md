@@ -4,7 +4,24 @@ All notable changes to Harness Scorecard are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.8.0] - 2026-06-28
+## [1.9.0] - 2026-06-28
+
+### Changed
+
+- **Dispatcher-introspection evidence now lives on the checks.** The per-check guard signatures
+  that `--credit-detected` matches moved out of a hardcoded table in `introspect.py` and onto each
+  check as a `dispatcher_evidence` field. The signature lives with the check it belongs to, so it
+  can't drift out of sync, and a new check is covered the moment it declares one — the introspector
+  is now harness-agnostic rather than Codex-keyed. No behavior change for existing Codex scans.
+
+### Added
+
+- **Dispatcher introspection now covers Claude (HS-*) checks, not just Codex.** Seeded
+  `dispatcher_evidence` on the Claude destructive-git checks (protected-branch push, catastrophic
+  `rm -rf`, force-push), so a Claude harness that routes its git/destructive guards through an
+  opaque dispatcher gets the same suggest-by-default / `--credit-detected` treatment Codex does.
+  The protected-branch check is a capability gate, so it is only ever *suggested*, never
+  auto-credited. Rubric unchanged at 1.0.0.
 
 ### Added
 

@@ -105,6 +105,10 @@ CHECKS: list[Check] = [
             "Block push to main/master via a PreToolUse Bash hook or a deny entry "
             "(not hard_deny alone under bypass)."
         ),
+        dispatcher_evidence=(
+            r"git\s+push\b[^\n]{0,30}\b(?:main|master)\b",
+            r"protect(?:ed)?[_\s-]?branch",
+        ),
     ),
     Check(
         id="HS-D4-02",
@@ -114,6 +118,7 @@ CHECKS: list[Check] = [
         evaluate=_check_catastrophic_deletion,
         severity=Severity.HIGH,
         remediation="Add a dangerous-command hook and deny rm -rf at shallow depth.",
+        dispatcher_evidence=(r"rm\s+-rf", r"\bblock[_\s-]?dangerous"),
     ),
     Check(
         id="HS-D4-03",
@@ -144,5 +149,9 @@ CHECKS: list[Check] = [
         severity=Severity.MEDIUM,
         detectability=Detectability.PARTIAL,
         remediation="Enforce a no-force-push policy via the git-safety hook, not docs alone.",
+        dispatcher_evidence=(
+            r"force[_\s-]?push",
+            r"git\s+push\b[^\n]*(?:--force|-f)\b",
+        ),
     ),
 ]

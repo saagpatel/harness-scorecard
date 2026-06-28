@@ -112,5 +112,10 @@ CHECKS: list[Check[CodexConfig]] = [
         severity=Severity.MEDIUM,
         detectability=Detectability.STATIC,
         remediation="Add a PreToolUse hook that rejects edits/writes targeting ~/.codex.",
+        dispatcher_evidence=(
+            r"\bCODEX_SELF_WRITE_RE\b",
+            r"self[_\s-]?protect",
+            r"\.codex/(?:hooks|agents|config)",
+        ),
     ),
 ]

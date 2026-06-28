@@ -43,6 +43,11 @@ CHECKS: list[Check[CodexConfig]] = [
         severity=Severity.MEDIUM,
         detectability=Detectability.STATIC,
         remediation="Add a PostToolUse hook that appends tool calls to an audit log.",
+        dispatcher_evidence=(
+            r"\bHOOK_AUDIT_LOG\b",
+            r"\baudit\.jsonl\b",
+            r"\bappend_audit\s*\(",
+        ),
     ),
     Check(
         id="CDX-D10-02",

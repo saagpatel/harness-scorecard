@@ -53,6 +53,11 @@ CHECKS: list[Check[CodexConfig]] = [
         severity=Severity.MEDIUM,
         detectability=Detectability.STATIC,
         remediation="Add a Stop hook that runs build/test/verification before the agent yields.",
+        dispatcher_evidence=(
+            r"\bvalidate_closeout_claims\s*\(",
+            r"\bcheck_codex_config_surfaces\s*\(",
+            r"\bsafe_verification\s*\(",
+        ),
     ),
     Check(
         id="CDX-D6-02",

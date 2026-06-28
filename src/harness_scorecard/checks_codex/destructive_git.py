@@ -131,6 +131,11 @@ CHECKS: list[Check[CodexConfig]] = [
         remediation=(
             "Add a PreToolUse hook on the Bash matcher that blocks force-push and destructive rm."
         ),
+        dispatcher_evidence=(
+            r"force[_\s-]?push",
+            r"git\s+push\b[^\n]*--force",
+            r"git\s+(?:reset|rebase|filter-branch|filter-repo)\b",
+        ),
     ),
     Check(
         id="CDX-D4-03",
