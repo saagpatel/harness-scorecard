@@ -32,9 +32,21 @@ def redact_path(path: str) -> str:
     return path
 
 
+def _redact_home(text: str) -> str:
+    """Collapse the home dir to ``~`` wherever it appears in free text, not just as a prefix.
+
+    The negative lookahead ``(?![\\w.-])`` requires the next character after the home prefix to
+    be a path separator or boundary, so a sibling user (``/Users/doppelganger`` vs home
+    ``/Users/d``) is left untouched. ``_HOME`` is read at call time so tests can monkeypatch it.
+    """
+    if not _HOME:
+        return text
+    return re.sub(re.escape(_HOME) + r"(?![\w.-])", "~", text)
+
+
 def redact_text(text: str) -> str:
     """Redact emails, prefixed secrets, opaque tokens, and home paths from free text."""
-    text = redact_path(text)
+    text = _redact_home(text)
     text = _EMAIL.sub("[redacted-email]", text)
     text = _PREFIXED_SECRET.sub("[redacted-secret]", text)
     return _TOKEN.sub("[redacted-token]", text)

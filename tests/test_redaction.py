@@ -42,5 +42,23 @@ class TestRedactText(unittest.TestCase):
         self.assertEqual(redact_text(text), text)
 
 
+class TestRedactTextHomePaths(unittest.TestCase):
+    def setUp(self):
+        self._orig_home = redaction._HOME
+        redaction._HOME = "/Users/d"
+
+    def tearDown(self):
+        redaction._HOME = self._orig_home
+
+    def test_embedded_home_path_is_collapsed(self):
+        # A home path mid-sentence (not the whole string) must still be scrubbed.
+        out = redact_text("config lives under /Users/d/.claude/settings.json today")
+        self.assertEqual(out, "config lives under ~/.claude/settings.json today")
+
+    def test_embedded_sibling_user_is_preserved(self):
+        out = redact_text("see /Users/doppelganger/.claude for the other config")
+        self.assertEqual(out, "see /Users/doppelganger/.claude for the other config")
+
+
 if __name__ == "__main__":
     unittest.main()
