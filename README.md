@@ -26,13 +26,32 @@ score an A with readable credentials, no matter how many cheap checks pass).
 
 ```bash
 # Grade a harness directory (e.g. your ~/.claude)
-uv run harness-scorecard scan ~/.claude
+harness-scorecard scan ~/.claude
 
 # JSON for tooling, plus a self-contained HTML scorecard
-uv run harness-scorecard scan ~/.claude --format json --html scorecard.html
+harness-scorecard scan ~/.claude --format json --html scorecard.html
+
+# SARIF 2.1.0 for CI / GitHub code scanning, failing the run below grade C
+harness-scorecard scan ~/.claude --sarif harness.sarif --min-grade C
 ```
 
-Exit codes: `0` healthy (A/B) · `1` needs attention (C/D/F) · `2` invalid input.
+`--min-grade {A,B,C,D,F}` sets the bar (default `B`). Exit codes: `0` meets the bar ·
+`1` below the bar · `2` no harness found.
+
+## GitHub Action
+
+Grade your harness in CI and upload the findings to code scanning:
+
+```yaml
+- uses: saagpatel/harness-scorecard@v1
+  with:
+    path: .claude
+    min-grade: B
+```
+
+The action writes SARIF and uploads it (requires `security-events: write`) **even when the grade
+fails the build**, so findings always reach code scanning. A complete workflow — permissions,
+weekly scheduling, SARIF upload — is in [`examples/github-workflow.yml`](examples/github-workflow.yml).
 
 ## Guarantees
 
@@ -54,8 +73,8 @@ rubric is versioned and emitted in every report.
 ## Development
 
 ```bash
-uv sync --all-groups          # install dev tooling (ruff, ty, pytest)
-uv run python -m unittest     # stdlib test runner — zero extra deps
-uv run pytest                 # same suite under pytest
-uv run ruff check && uv run ty check src/
+uv sync --frozen                                      # install dev tooling from the lockfile
+uv run --no-sync python -m unittest discover -s tests # tests (stdlib runner, zero extra deps)
+uv run --no-sync ruff check src/ tests/               # lint
+uv run --no-sync ty check src/                        # type check
 ```

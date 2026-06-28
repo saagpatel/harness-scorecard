@@ -3,12 +3,41 @@ name = "harness-scorecard"
 version = "0.1.0"
 description = "A read-only linter and A-F maturity grader for coding-agent harnesses (Claude Code, Codex)."
 readme = "README.md"
-authors = [{ name = "Harness Scorecard maintainers" }]
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Saagar Patel" }]
 requires-python = ">=3.12"
+keywords = [
+    "claude-code",
+    "codex",
+    "coding-agent",
+    "harness",
+    "linter",
+    "sarif",
+    "security",
+    "static-analysis",
+    "supply-chain",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Security",
+    "Topic :: Software Development :: Quality Assurance",
+    "Typing :: Typed",
+]
 # Runtime is intentionally dependency-free: stdlib only.
 # A scorer that grades supply-chain hygiene should carry the smallest
 # possible dependency surface itself. Dev tooling lives in [dependency-groups].
 dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/saagpatel/harness-scorecard"
+Repository = "https://github.com/saagpatel/harness-scorecard"
+Issues = "https://github.com/saagpatel/harness-scorecard/issues"
 
 [project.scripts]
 harness-scorecard = "harness_scorecard.cli:main"
@@ -53,7 +82,7 @@ ignore = [
     "PT027",        # unittest-style assertRaises is intentional here
     "INP001",       # tests/ is intentionally not an importable package
     "N802",         # setUp / tearDown are the unittest API
-    "S108",         # the scratchpad temp path is intentional
+    "S108",         # fixture configs use placeholder /tmp roots that are never written
 ]
 "src/harness_scorecard/cli.py" = ["T201"]  # print is the CLI's output channel
 

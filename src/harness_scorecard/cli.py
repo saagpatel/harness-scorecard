@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 
 from harness_scorecard.discovery import load_harness
@@ -18,14 +19,21 @@ from harness_scorecard.sarif import render_sarif
 from harness_scorecard.scoring import score_harness
 
 
+def _version_string() -> str:
+    """Report the installed package version alongside the rubric version they grade against."""
+    try:
+        package = version("harness-scorecard")
+    except PackageNotFoundError:  # running from a source tree without an install
+        package = "0+source"
+    return f"harness-scorecard {package} (rubric {RUBRIC_VERSION})"
+
+
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="harness-scorecard",
         description="Grade a coding-agent harness configuration against the red-team rubric.",
     )
-    parser.add_argument(
-        "--version", action="version", version=f"harness-scorecard {RUBRIC_VERSION}"
-    )
+    parser.add_argument("--version", action="version", version=_version_string())
     sub = parser.add_subparsers(dest="command", required=True)
 
     scan = sub.add_parser("scan", help="Scan and grade a harness directory.")

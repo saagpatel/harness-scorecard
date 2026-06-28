@@ -7,8 +7,20 @@ import unittest
 from pathlib import Path
 
 from harness_scorecard.cli import main
+from harness_scorecard.models import RUBRIC_VERSION
 
 FIXTURES = Path(__file__).parent / "fixtures"
+
+
+class TestVersion(unittest.TestCase):
+    def test_version_reports_both_package_and_rubric(self):
+        buffer = io.StringIO()
+        with contextlib.redirect_stdout(buffer), self.assertRaises(SystemExit) as ctx:
+            main(["--version"])
+        self.assertEqual(ctx.exception.code, 0)
+        out = buffer.getvalue()
+        self.assertIn("rubric", out)
+        self.assertIn(RUBRIC_VERSION, out)
 
 
 def run_cli(argv: list[str]) -> tuple[int, str]:
