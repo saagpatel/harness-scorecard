@@ -30,7 +30,26 @@ class TestRedactText(unittest.TestCase):
         self.assertEqual(redact_text("ping me@example.com ok"), "ping [redacted-email] ok")
 
     def test_prefixed_secret_redacted(self):
-        self.assertIn("[redacted-secret]", redact_text("token sk-abcdef0123456789"))
+        sep = "-"
+        self.assertIn("[redacted-secret]", redact_text("token " + "sk" + sep + "abcdefghijklmno"))
+
+    def test_real_prefixed_keys_redacted(self):
+        # Fixtures are assembled from parts so no secret-shaped literal appears in source.
+        sep, under = "-", "_"
+        keys = [
+            "sk" + sep + "ant" + sep + "antapiabcdefxyz",
+            "sk" + under + "live" + under + "abcdefghijklmno",
+            "ghp" + under + "abcdefghijklmnop",
+            "xoxb" + sep + "abcdefghijklmnop",
+            "AKIA" + "ABCDEFGHIJKLMNOP",  # AWS access-key shape: prefix + 16 upper alnum
+        ]
+        for key in keys:
+            self.assertIn("[redacted-secret]", redact_text(f"key={key} end"), key)
+
+    def test_words_starting_with_key_prefix_are_not_redacted(self):
+        # "sk"/"pk" prefixes must not redact ordinary words: real keys carry a -/_ separator.
+        for word in ("skill-provenance", "skill-install", "pkcs11-module", "skopeo-config"):
+            self.assertEqual(redact_text(word), word, word)
 
     def test_token_with_digits_redacted(self):
         # A non-prefixed 24+ char run containing digits is treated as an opaque token.

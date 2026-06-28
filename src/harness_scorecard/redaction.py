@@ -17,8 +17,15 @@ _EMAIL = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
 # containing at least one digit. The digit requirement avoids redacting long but
 # digit-free identifiers (e.g. a harness directory name), which are not secrets.
 _TOKEN = re.compile(r"\b(?=[A-Za-z0-9_\-]*\d)[A-Za-z0-9_\-]{24,}\b")
-# Common key prefixes worth redacting even when short / digit-free.
-_PREFIXED_SECRET = re.compile(r"\b(?:sk|pk|ghp|gho|xox[baprs]|AKIA)[-_A-Za-z0-9]{8,}\b")
+# Common key prefixes worth redacting even when short / digit-free. The alphabetic prefixes
+# (sk/pk/gh*/xox*) are always followed by a ``-``/``_`` separator in real keys (``sk-ant-…``,
+# ``sk_live_…``, ``ghp_…``, ``xoxb-…``); requiring that separator avoids redacting ordinary words
+# that merely start with those letters ("skill-provenance", "pkcs11"). AWS access-key ids
+# (``AKIA`` + 16 uppercase alnum) carry no separator, so they are a distinct alternative.
+_PREFIXED_SECRET = re.compile(
+    r"\b(?:(?:sk|pk|ghp|gho|ghs|ghr|xox[baprs])[-_][A-Za-z0-9][-_A-Za-z0-9]{6,}"
+    r"|AKIA[0-9A-Z]{16})\b"
+)
 
 
 def redact_path(path: str) -> str:
