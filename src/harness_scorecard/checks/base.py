@@ -65,6 +65,11 @@ def failed(message: str, evidence: Iterable[str] = ()) -> CheckOutcome:
     return CheckOutcome(Status.FAIL, message, list(evidence))
 
 
+def not_applicable(message: str, evidence: Iterable[str] = ()) -> CheckOutcome:
+    """A check that does not apply to this harness; excluded from the dimension denominator."""
+    return CheckOutcome(Status.NOT_APPLICABLE, message, list(evidence))
+
+
 @dataclass(frozen=True, slots=True)
 class Check[ConfigT]:
     """A single rubric check: metadata plus an evaluation function.
