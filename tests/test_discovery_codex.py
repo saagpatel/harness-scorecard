@@ -101,6 +101,17 @@ class TestLoadContract(unittest.TestCase):
             config = load_codex_harness(tmp)
         self.assertFalse(config.env_secrets_scrubbed)
 
+    def test_benign_env_name_with_key_substring_is_not_a_secret(self) -> None:
+        # MONKEY_ID ends in KEY but is not a credential; scrubbing must stay True.
+        toml = (
+            '[shell_environment_policy]\ninherit = "core"\n'
+            '[shell_environment_policy.set]\nMONKEY_ID = "42"\n'
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            (Path(tmp) / "config.toml").write_text(toml, encoding="utf-8")
+            config = load_codex_harness(tmp)
+        self.assertTrue(config.env_secrets_scrubbed)
+
     def test_bool_not_read_as_int_for_agent_bounds(self) -> None:
         # max_threads omitted -> None, never coerced from an unrelated bool.
         with tempfile.TemporaryDirectory() as tmp:

@@ -46,6 +46,17 @@ class TestScanCommand(unittest.TestCase):
         code, _ = run_cli(["scan", str(FIXTURES / "nope")])
         self.assertEqual(code, 2)
 
+    def test_codex_harness_is_auto_detected(self):
+        code, out = run_cli(["scan", str(FIXTURES / "codex_weak")])
+        self.assertEqual(code, 1)
+        self.assertIn("(codex)", out)
+        self.assertIn("Capability gates tripped", out)
+
+    def test_codex_strong_grades_b(self):
+        code, out = run_cli(["scan", str(FIXTURES / "codex_strong"), "--type", "codex"])
+        self.assertEqual(code, 0)
+        self.assertIn("GRADE:  B", out)
+
     def test_json_format_is_valid_json(self):
         _, out = run_cli(["scan", str(FIXTURES / "strong_harness"), "--format", "json"])
         payload = json.loads(out)

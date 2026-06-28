@@ -11,7 +11,7 @@ import sys
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 
-from harness_scorecard.discovery import load_harness
+from harness_scorecard.dispatch import HARNESS_TYPES, select_adapter
 from harness_scorecard.htmlreport import render_html
 from harness_scorecard.models import RUBRIC_VERSION, Grade, grade_rank
 from harness_scorecard.report import render_console, render_json
@@ -37,7 +37,14 @@ def _build_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command", required=True)
 
     scan = sub.add_parser("scan", help="Scan and grade a harness directory.")
-    scan.add_argument("path", help="Path to the harness directory (e.g. ~/.claude).")
+    scan.add_argument("path", help="Path to the harness directory (e.g. ~/.claude or ~/.codex).")
+    scan.add_argument(
+        "--type",
+        dest="harness_type",
+        choices=list(HARNESS_TYPES),
+        default="auto",
+        help="Harness type (default: auto-detect Claude Code vs Codex).",
+    )
     scan.add_argument(
         "--format",
         choices=["console", "json"],
@@ -74,12 +81,12 @@ def _build_parser() -> argparse.ArgumentParser:
 def _run_scan(args: argparse.Namespace) -> int:
     root = Path(args.path).expanduser()
     try:
-        config = load_harness(root)
+        config, checks = select_adapter(root, args.harness_type)
     except FileNotFoundError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
 
-    card = score_harness(config)
+    card = score_harness(config, checks)
     output = render_json(card) if args.format == "json" else render_console(card)
     print(output)
 

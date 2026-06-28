@@ -19,13 +19,16 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from harness_scorecard.discovery import (
+from harness_scorecard.parsing import (
     HookEntry,
-    _as_dict,
-    _as_str_list,
-    _flatten_hooks,
-    _read_json,
+    event_present,
+    hook_on_tool,
+    hook_present,
 )
+from harness_scorecard.parsing import as_dict as _as_dict
+from harness_scorecard.parsing import as_str_list as _as_str_list
+from harness_scorecard.parsing import flatten_hooks as _flatten_hooks
+from harness_scorecard.parsing import read_json as _read_json
 
 HARNESS_TYPE_CODEX = "codex"
 
@@ -41,8 +44,12 @@ APPROVAL_NEVER = "never"
 TRUST_TRUSTED = "trusted"
 
 # Env var names that look like secrets; Codex's default excludes scrub these, but an explicit
-# shell_environment_policy.set can re-introduce them into the subprocess environment.
-_SECRET_ENV_HINT = re.compile(r"KEY|SECRET|TOKEN|PASSWORD|CREDENTIAL", re.IGNORECASE)
+# shell_environment_policy.set can re-introduce them into the subprocess environment. The
+# lookarounds treat letters as the boundary (env names use ``_``/digits as separators) so
+# AWS_SECRET_ACCESS_KEY matches while MONKEY / TURKEY do not.
+_SECRET_ENV_HINT = re.compile(
+    r"(?<![A-Za-z])(?:KEY|SECRET|TOKEN|PASSWORD|CREDENTIAL)(?![A-Za-z])", re.IGNORECASE
+)
 
 
 @dataclass(slots=True)
@@ -136,6 +143,20 @@ class CodexConfig:
     def has_trusted_project(self) -> bool:
         """True when any project is marked trusted (approval suppression inside that dir)."""
         return bool(self.trusted_projects)
+
+    # --- hook query helpers (shared matcher logic with the Claude Code adapter) -----
+
+    def has_hook(self, event: str, command_contains: str, matcher: str | None = None) -> bool:
+        """True if a hook under ``event`` whose command matches also covers ``matcher``'s lane."""
+        return hook_present(self.hooks, event, command_contains, matcher)
+
+    def has_hook_on_tool(self, event: str, command_contains: str, tool_name: str) -> bool:
+        """True if a hook under ``event`` whose command matches also covers ``tool_name``'s lane."""
+        return hook_on_tool(self.hooks, event, command_contains, tool_name)
+
+    def has_event(self, event: str) -> bool:
+        """True when at least one hook is registered under ``event`` (any matcher)."""
+        return event_present(self.hooks, event)
 
 
 def _read_toml(path: Path) -> dict[str, Any]:
