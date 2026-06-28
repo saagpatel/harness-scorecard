@@ -1,5 +1,12 @@
 {
 	"hooks": {
+		"UserPromptSubmit": [
+			{
+				"hooks": [
+					{ "type": "command", "command": "python3 hooks/sanitize-prompt.py" }
+				]
+			}
+		],
 		"PreToolUse": [
 			{
 				"matcher": "Bash",

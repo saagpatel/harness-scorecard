@@ -47,7 +47,7 @@ class TestStrongCodexHarness(unittest.TestCase):
         self.assertEqual(self.config.agent_files, ["worker.toml"])
         self.assertEqual(self.config.history_persistence, "save-all")
         events = {h.event for h in self.config.hooks}
-        self.assertEqual(events, {"PreToolUse", "PostToolUse", "Stop"})
+        self.assertEqual(events, {"UserPromptSubmit", "PreToolUse", "PostToolUse", "Stop"})
         self.assertTrue(any("git-safety" in h.command for h in self.config.hooks))
 
 

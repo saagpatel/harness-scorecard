@@ -10,14 +10,18 @@ from __future__ import annotations
 from harness_scorecard.checks.base import Check
 from harness_scorecard.checks_codex import (
     destructive_git,
+    egress,
     secret_protection,
     self_protection,
+    tool_surface,
 )
 from harness_scorecard.discovery_codex import CodexConfig
 
 # Order = rubric dimension order. New Codex dimension modules append here as they land.
 CODEX_CHECKS: list[Check[CodexConfig]] = [
     *secret_protection.CHECKS,
+    *egress.CHECKS,
+    *tool_surface.CHECKS,
     *destructive_git.CHECKS,
     *self_protection.CHECKS,
 ]
