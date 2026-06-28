@@ -119,6 +119,11 @@ CHECKS: list[Check] = [
         evaluate=_check_write_time_secret_scan,
         severity=Severity.HIGH,
         remediation="Add a PreToolUse Edit/Write secret detector and/or a PostToolUse secret scan.",
+        dispatcher_evidence=(
+            r"detect[_-]?secrets?",
+            r"\b(?:run|exec|subprocess|popen|call)\b[^\n]{0,20}\bsemgrep\b",
+            r"secret[_-]?scan",
+        ),
     ),
     Check(
         id="HS-D1-04",

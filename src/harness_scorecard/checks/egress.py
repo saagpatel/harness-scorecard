@@ -49,6 +49,11 @@ CHECKS: list[Check] = [
         evaluate=_check_network_egress_guard,
         severity=Severity.HIGH,
         remediation="Add a PreToolUse Bash hook inspecting curl/wget for exfiltration; deny wget.",
+        dispatcher_evidence=(
+            r"(?<![a-z])egress",
+            r"exfil",
+            r"\b(?:curl|wget)\b[^\n]{0,40}(?:--data|--upload-file|--form|-d\s|-F\s|-T\s)",
+        ),
     ),
     Check(
         id="HS-D2-02",

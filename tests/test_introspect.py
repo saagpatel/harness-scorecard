@@ -74,6 +74,34 @@ def guard(command, tool):
     if "git push --force" in command:
         return "deny", "force-push blocked"
     return "allow", ""
+
+
+def secret_scan(content):
+    return detect_secrets(content)
+
+
+def block_egress(command):
+    return "exfil" in command or re.search(r"curl .*--data @host", command)
+
+
+def database_guard(command):
+    return re.search(r"DROP TABLE", command)
+
+
+def dependency_gate(command):
+    return "--frozen-lockfile" in command or "--locked" in command
+
+
+def skill_install_gate(path):
+    return ".claude/skills" in path
+
+
+def scope_linter(task):
+    return subagent_scope_ok(task)
+
+
+def defer_destructive(command):
+    return "rm -rf" in command and require_confirm()
 """
 
 # The dispatcher's sibling, where shared integrity/snapshot/audit helpers live.
@@ -401,7 +429,21 @@ class TestClaudeCoverage(unittest.TestCase):
                 [_hook("PreToolUse", "python3 hooks/pre_tool_use_dispatch.py")],
                 ALL_CHECKS,
             )
-        seeded = {"HS-D3-02", "HS-D5-01", "HS-D5-02", "HS-D5-03", "HS-D10-01", "HS-D1-02"}
+        seeded = {
+            "HS-D1-02",
+            "HS-D1-03",
+            "HS-D2-01",
+            "HS-D3-02",
+            "HS-D4-03",
+            "HS-D4-04",
+            "HS-D5-01",
+            "HS-D5-02",
+            "HS-D5-03",
+            "HS-D7-03",
+            "HS-D8-02",
+            "HS-D9-01",
+            "HS-D10-01",
+        }
         self.assertTrue(seeded.issubset(found), f"missing: {seeded - set(found)}")
         # The audit guard lives in the sibling common.py, not the dispatcher entrypoint.
         self.assertIn("common.py", found["HS-D10-01"].location)
@@ -416,7 +458,20 @@ class TestClaudeCoverage(unittest.TestCase):
 
         s_by_id = {c.id: c for dim in suggested.dimensions for c in dim.checks}
         c_by_id = {c.id: c for dim in credited.dimensions for c in dim.checks}
-        for check_id in ("HS-D3-02", "HS-D5-02", "HS-D5-03", "HS-D10-01", "HS-D1-02"):
+        for check_id in (
+            "HS-D1-02",
+            "HS-D1-03",
+            "HS-D2-01",
+            "HS-D3-02",
+            "HS-D4-03",
+            "HS-D4-04",
+            "HS-D5-02",
+            "HS-D5-03",
+            "HS-D7-03",
+            "HS-D8-02",
+            "HS-D9-01",
+            "HS-D10-01",
+        ):
             self.assertIn(check_id, detected)
             self.assertIs(s_by_id[check_id].status, Status.FAIL)  # suggest-only by default
             self.assertTrue(any(check_id in note for note in suggested.policy_notes))
@@ -492,6 +547,72 @@ class TestClaudeCoverage(unittest.TestCase):
                 "def protect_sensitive_reads():",
             ),
             ("awscli_version = '2'", "protective_reads = 0"),
+        ),
+        "HS-D1-03": (
+            (
+                "    return detect_secrets(blob)",
+                "    subprocess.run(['semgrep', path])",
+                "def secret_scan(content):",
+            ),
+            (
+                "secretary = User()",
+                "    self.secrets = vault",
+                "    if tool_name == 'semgrep':",
+                "    call_context = {'semgrep': config}",
+            ),
+        ),
+        "HS-D2-01": (
+            (
+                "EGRESS_HOSTS = load_blocklist()",
+                "def block_exfil(cmd):",
+                "    if re.search(r'curl .*--data', c):",
+            ),
+            ("progress = 0.5", "    cmd = ['curl', user + '@' + host]", "    run(['curl', url])"),
+        ),
+        "HS-D4-03": (
+            (
+                "def database_guard(cmd):",
+                "    if 'DROP TABLE' in sql:",
+                "DESTRUCTIVE_DB_RE = compile(p)",
+            ),
+            ("dropdown = render()", "guard_clause(ctx)"),
+        ),
+        "HS-D4-04": (
+            (
+                "    if not install_gate.allows(cmd):",
+                "    if frozen_lockfile:",
+                "    if '--frozen-lockfile' in cmd:",
+            ),
+            (
+                "email_confirm_token = make()",
+                "    subprocess.run(['pip', 'install'])",
+                "    install_path = base",
+                "uninstall_gate = None",
+            ),
+        ),
+        "HS-D7-03": (
+            (
+                "def scope_linter(task):",
+                "SUBAGENT_SCOPE_RE = compile(p)",
+                "    if scope_creep(diff):",
+            ),
+            ("scoped_session()", "    lint_file(path)"),
+        ),
+        "HS-D8-02": (
+            (
+                "def defer_destructive(cmd):",
+                "DESTRUCTIVE_CONFIRM_RE = p",
+                "    if confirm_destructive(op):",
+            ),
+            ("deferred_jobs = []", "    confirm_email(user)"),
+        ),
+        "HS-D9-01": (
+            (
+                "def skill_install_gate(path):",
+                "    if '.claude/skills' in p:",
+                "SKILL_PROVENANCE = load()",
+            ),
+            ("skillful = True", "    install_deps()"),
         ),
     }
 

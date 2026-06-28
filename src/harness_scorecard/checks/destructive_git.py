@@ -130,6 +130,11 @@ CHECKS: list[Check] = [
         remediation=(
             "Add a PreToolUse Bash db-guard hook that blocks destructive ops on non-local hosts."
         ),
+        dispatcher_evidence=(
+            r"(?:db|database)[_-]?guard",
+            r"\b(?:DROP|TRUNCATE)\s+(?:TABLE|DATABASE)\b",
+            r"destructive[_-]?(?:db|sql|database)",
+        ),
     ),
     Check(
         id="HS-D4-04",
@@ -139,6 +144,14 @@ CHECKS: list[Check] = [
         evaluate=_check_dependency_install_gate,
         severity=Severity.MEDIUM,
         remediation="Require a confirm-token for *-add/install, or add a lockfile-freeze guard.",
+        # Anchored to install-specific guard names + frozen-install enforcement, NOT a bare
+        # `confirm-token` (ubiquitous in auth flows) or a `npm install` mention (appears in
+        # subprocess execs and help text) -- both false-credit non-install dispatchers.
+        dispatcher_evidence=(
+            r"\b(?:install|dependency|package)[_-]?(?:gate|guard)\b",
+            r"(?:lockfile[_-]?freeze|frozen[_-]?lockfile)",
+            r"(?:--frozen-lockfile|--locked|npm\s+ci)\b",
+        ),
     ),
     Check(
         id="HS-D4-05",

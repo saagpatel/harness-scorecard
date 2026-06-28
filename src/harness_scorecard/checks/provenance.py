@@ -39,6 +39,11 @@ CHECKS: list[Check] = [
         evaluate=_check_skill_install_gate,
         severity=Severity.MEDIUM,
         remediation="Add a PreToolUse Write/Edit skill-install gate plus a skill-provenance rule.",
+        dispatcher_evidence=(
+            r"skill[_-]?install",
+            r"\.claude/skills?\b",
+            r"skill[_-]?(?:provenance|guard|pack)",
+        ),
     ),
     Check(
         id="HS-D9-02",

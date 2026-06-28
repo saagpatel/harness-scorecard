@@ -4,6 +4,25 @@ All notable changes to Harness Scorecard are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.11.0] - 2026-06-28
+
+### Added
+
+- **Dispatcher introspection now covers every maskable check, across all dimensions.** Seeded
+  `dispatcher_evidence` on the last seven checks whose guard can hide behind an opaque dispatcher:
+  write-time secret scan (HS-D1-03), network-egress Bash guard (HS-D2-01), destructive-DB guard
+  (HS-D4-03), dependency-install gate (HS-D4-04), subagent scope-linter (HS-D7-03),
+  defer-destructive posture (HS-D8-02), and the skill-install provenance gate (HS-D9-01). With
+  this, the only unseeded checks are the ones introspection *cannot* improve on — settings
+  deny-rules, env vars, matcher-coverage checks, and hooks on events outside the scanned set
+  (`SessionStart` / `PreCompact` / `SubagentStop` / failure events) are visible directly. HS-D7-03
+  and HS-D8-02 are AND-checks with only one dispatcher-scannable half, so detection lifts them
+  FAIL → PARTIAL, never to PASS.
+- Each signature stays anchored to a code construct, and the per-pattern oracle test was extended
+  to pin the new anti-false-credit boundaries — an auth `confirm_token`, a `pip install` subprocess
+  exec, a `curl user@host` URL, and a `tool_name == "semgrep"` route all match nothing. Rubric
+  unchanged at 1.0.0.
+
 ## [1.10.0] - 2026-06-28
 
 ### Added

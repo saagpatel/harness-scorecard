@@ -82,5 +82,12 @@ CHECKS: list[Check] = [
         evaluate=_check_scope_governance,
         severity=Severity.MEDIUM,
         remediation="Add a PreToolUse Agent scope linter and a SubagentStop reviewer.",
+        # Only the PreToolUse-Agent scope-linter half is dispatcher-scannable; the SubagentStop
+        # reviewer half is on an unscanned event, so detection lifts FAIL->PARTIAL, never to PASS.
+        dispatcher_evidence=(
+            r"scope[_-]?linter",
+            r"subagent[_-]?scope",
+            r"scope[_-]?(?:creep|guard|govern)",
+        ),
     ),
 ]

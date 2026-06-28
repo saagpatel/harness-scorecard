@@ -60,5 +60,12 @@ CHECKS: list[Check] = [
         evaluate=_check_defer_and_isolate,
         severity=Severity.LOW,
         remediation="Defer destructive ops for confirmation and isolate work in git worktrees.",
+        # Only the PreToolUse-Bash defer-destructive half is dispatcher-scannable; the worktree
+        # half is settings/SessionStart, so detection lifts FAIL->PARTIAL, never to PASS.
+        dispatcher_evidence=(
+            r"defer[_-]?destructive",
+            r"destructive[_-]?confirm",
+            r"confirm[_-]?destructive",
+        ),
     ),
 ]
