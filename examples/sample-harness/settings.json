@@ -1,0 +1,52 @@
+{
+	"permissions": {
+		"defaultMode": "bypassPermissions",
+		"deny": [
+			"Read(~/.ssh/**)",
+			"Read(~/.aws/**)",
+			"Read(~/.gnupg/**)",
+			"Read(~/.config/gcloud/**)",
+			"Read(~/.op/**)",
+			"Read(**/.env*)",
+			"ListMcpResourcesTool(*)",
+			"ReadMcpResourceTool(*)",
+			"Bash(git push --force*)",
+			"Bash(git push origin main*)",
+			"Bash(git push origin master*)"
+		],
+		"allow": []
+	},
+	"autoMode": {
+		"hard_deny": [
+			"Read(~/.ssh/**)",
+			"Read(~/.aws/**)",
+			"push to main or master"
+		]
+	},
+	"env": {
+		"DISABLE_TELEMETRY": "1",
+		"DISABLE_ERROR_REPORTING": "1",
+		"MAX_MCP_OUTPUT_TOKENS": "25000"
+	},
+	"hooks": {
+		"PreToolUse": [
+			{
+				"matcher": "Bash",
+				"hooks": [{ "command": "bash hooks/git-safety.sh" }]
+			},
+			{
+				"matcher": "Bash",
+				"hooks": [{ "command": "bash hooks/block-dangerous-cmds.sh" }]
+			}
+		],
+		"PostToolUse": [
+			{
+				"matcher": "Bash",
+				"hooks": [{ "command": "bash hooks/bash-audit-log.sh" }]
+			}
+		],
+		"SessionStart": [
+			{ "matcher": "", "hooks": [{ "command": "bash hooks/worktree-init.sh" }] }
+		]
+	}
+}

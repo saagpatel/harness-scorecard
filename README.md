@@ -10,6 +10,53 @@ gaps, and the guards that are missing, each with rationale. The harness type is 
 with no way to tell if theirs is any good. The rubric is the product: every check traces to a
 **documented red-team failure mode**, not generic advice.
 
+## What it looks like
+
+```text
+$ harness-scorecard scan examples/sample-harness
+
+Harness Scorecard  v1.0.0
+Target: examples/sample-harness   (claude-code)
+
+  GRADE:  F        overall 0.28 / 1.00
+  Scored 10 of 10 rubric dimensions (0 specced, pending).
+
+  Capability gates tripped (grade capped):
+    - HS-D5-01 caps at C  (Harness config write/read protected)
+
+  D1  Secret protection & credential isolation    0.44  [weight 5]
+      [PASS] HS-D1-01  Sensitive credential paths denied for read  [GATE->D]
+             All core credential paths are denied for read.
+             - covered: ~/.ssh, ~/.aws, ~/.gnupg, 1Password/op, gcloud, .env files
+      [FAIL] HS-D1-02  Sensitive-read Bash backstop
+             No Bash-level backstop for sensitive reads; deny lists cover only the Read tool.
+             fix: Add a PreToolUse Bash hook that re-blocks reads of sensitive files.
+      … (+4 more checks)
+
+  D4  Destructive-action & git safety    0.63  [weight 5]
+      [PASS] HS-D4-01  Push to protected branch effectively blocked  [GATE->C]
+             Push to a protected branch is blocked by the effective floor.
+             - hook:git-safety
+             - permissions.deny
+      [PASS] HS-D4-02  Catastrophic deletion blocked
+             Catastrophic deletion is blocked by the effective floor.
+             - hook:block-dangerous-cmds
+             - hook:dangerous
+      [FAIL] HS-D4-03  Destructive DB ops on non-local hosts blocked
+             No effective guard against destructive DB operations on non-local hosts.
+             - defaultMode=bypassPermissions: autoMode.hard_deny is INERT
+             fix: Add a PreToolUse Bash db-guard hook that blocks destructive ops on non-local hosts.
+      … (+2 more checks)
+
+  … (+8 more dimensions)
+```
+
+That one line — `defaultMode=bypassPermissions: autoMode.hard_deny is INERT` — is the whole
+thesis rendered live: a rich `hard_deny` block earns **nothing** because the mode makes it
+inert. The sample above ([`examples/sample-harness`](examples/sample-harness/settings.json)) is
+deliberately incomplete to show the findings; run it yourself, or point the tool at your own
+`~/.claude` — a mature harness scores an A.
+
 ## What makes the grade real
 
 Most config "linters" credit a harness for declaring a rule. This one models the *effective*
