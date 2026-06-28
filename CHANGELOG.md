@@ -4,6 +4,16 @@ All notable changes to Harness Scorecard are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.0] - 2026-06-28
+
+### Added
+
+- **`scan --explain`** — folds the one-line red-team failure mode inline next to every finding
+  that isn't passing (FAIL/PARTIAL), so the *why* rides along with the grade and no second
+  command is needed. Draws from the same in-package narrative registry as the `explain` command,
+  printed as a `why:` line above each `fix:`. Console output only; the flag is a no-op for
+  `--format json` (the structured report is unchanged). The rubric is unchanged at **1.0.0**.
+
 ## [1.5.0] - 2026-06-28
 
 ### Added

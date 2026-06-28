@@ -98,6 +98,12 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Also write a flat SVG grade badge to FILE (for a repo README).",
     )
     scan.add_argument(
+        "--explain",
+        action="store_true",
+        help="Annotate each non-passing finding with its red-team failure mode "
+        "(console output only).",
+    )
+    scan.add_argument(
         "--min-grade",
         choices=[grade.value for grade in Grade],
         default=Grade.B.value,
@@ -195,7 +201,9 @@ def _run_scan(args: argparse.Namespace) -> int:
         return 2
 
     card = score_harness(config, checks, policy)
-    output = render_json(card) if args.format == "json" else render_console(card)
+    output = (
+        render_json(card) if args.format == "json" else render_console(card, explain=args.explain)
+    )
     print(output)
 
     if args.json_out:

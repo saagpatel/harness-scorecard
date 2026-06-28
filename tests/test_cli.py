@@ -66,6 +66,42 @@ class TestScanCommand(unittest.TestCase):
         self.assertEqual(payload["dimensions_scored"], 10)
 
 
+class TestScanExplain(unittest.TestCase):
+    def test_explain_annotates_failing_findings_with_the_failure_mode(self):
+        code, out = run_cli(
+            ["scan", str(FIXTURES / "weak_harness"), "--explain", "--min-grade", "F"]
+        )
+        self.assertEqual(code, 0)
+        self.assertIn("why:", out)
+        # the annotation is the documented failure mode for the failing bypass-aware gate
+        self.assertIn("hard_deny is inert", out)
+
+    def test_without_explain_there_are_no_why_lines(self):
+        _, out = run_cli(["scan", str(FIXTURES / "weak_harness"), "--min-grade", "F"])
+        self.assertNotIn("why:", out)
+
+    def test_explain_annotates_nothing_on_an_all_passing_harness(self):
+        # strong_harness is all PASS, so there is no actionable finding to annotate.
+        _, out = run_cli(["scan", str(FIXTURES / "strong_harness"), "--explain"])
+        self.assertNotIn("why:", out)
+
+    def test_explain_is_console_only_and_leaves_json_untouched(self):
+        _, out = run_cli(
+            [
+                "scan",
+                str(FIXTURES / "weak_harness"),
+                "--explain",
+                "--format",
+                "json",
+                "--min-grade",
+                "F",
+            ]
+        )
+        payload = json.loads(out)
+        self.assertEqual(payload["grade"], "F")
+        self.assertNotIn("why:", out)
+
+
 class TestMinGradeGate(unittest.TestCase):
     def test_min_grade_f_passes_a_failing_harness(self):
         # Loosening the bar to F means even the weak harness clears the gate.

@@ -143,6 +143,19 @@ For the six capability gates, `explain` points at the red-team corpus pair that 
 check. Works for any check id (`HS-*` or `CDX-*`, case-insensitive); `--format json` emits the
 same content for tooling.
 
+Or skip the second command entirely — `scan --explain` folds the one-line failure mode inline
+next to every finding that isn't passing, so the *why* rides along with the grade:
+
+```text
+$ harness-scorecard scan ~/.claude --explain
+...
+      [FAIL] HS-D4-01  Push to protected branch effectively blocked  [GATE->C]
+             Push to main/master is not blocked by any effective guard.
+             why: A config that declares 'never push to main' only in autoMode.hard_deny does
+                  nothing under bypassPermissions, so the agent or an injection pushes to main.
+             fix: Block push to main/master via a PreToolUse Bash hook or a deny entry.
+```
+
 ### Grade your whole machine
 
 `fleet` grades several harnesses at once and reports the distribution and the worst offender —

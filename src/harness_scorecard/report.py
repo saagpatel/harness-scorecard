@@ -6,6 +6,7 @@ import json
 from typing import Any
 
 from harness_scorecard.checks import DIMENSIONS
+from harness_scorecard.failure_modes import FAILURE_MODES
 from harness_scorecard.models import (
     CheckResult,
     Detectability,
@@ -30,7 +31,7 @@ def _pending_dimension_ids(card: Scorecard) -> list[str]:
     return [dim_id for dim_id in DIMENSIONS if dim_id not in scored]
 
 
-def _check_line(check: CheckResult) -> list[str]:
+def _check_line(check: CheckResult, *, explain: bool = False) -> list[str]:
     gate = f"  [GATE->{check.gate_cap.value}]" if check.is_gate and check.gate_cap else ""
     tag = "WAIV" if check.waived else _STATUS_TAG[check.status]
     credited = "  (dispatcher-credited)" if check.dispatcher_credited else ""
@@ -41,7 +42,14 @@ def _check_line(check: CheckResult) -> list[str]:
     ]
     if check.waived:
         lines.append(f"             waived: {redact_text(check.waiver_reason)}")
-    elif check.status is not Status.PASS and check.remediation:
+        return lines
+    # --explain annotates each actionable finding with the red-team failure mode it guards
+    # against (the why behind the fix), from the same registry the explain command uses.
+    if explain and check.status in (Status.FAIL, Status.PARTIAL):
+        failure_mode = FAILURE_MODES.get(check.id)
+        if failure_mode:
+            lines.append(f"             why: {redact_text(failure_mode)}")
+    if check.status is not Status.PASS and check.remediation:
         lines.append(f"             fix: {redact_text(check.remediation)}")
     return lines
 
@@ -80,8 +88,12 @@ def _policy_summary_lines(card: Scorecard) -> list[str]:
     return out
 
 
-def render_console(card: Scorecard) -> str:
-    """A skimmable, dependency-free text report."""
+def render_console(card: Scorecard, *, explain: bool = False) -> str:
+    """A skimmable, dependency-free text report.
+
+    When ``explain`` is set, each non-passing finding is annotated with the red-team failure
+    mode it guards against, so the console output is self-explanatory without a second command.
+    """
     out: list[str] = []
     out.append(f"Harness Scorecard  v{card.rubric_version}")
     out.append(f"Target: {redact_text(card.harness_path)}   ({card.harness_type})")
@@ -115,7 +127,7 @@ def render_console(card: Scorecard) -> str:
         excluded = "  (excluded: all findings waived)" if all_waived else ""
         out.append(f"  {dim.id}  {dim.name}    {dim.score:.2f}  [weight {dim.weight}]{excluded}")
         for check in dim.checks:
-            out.extend(_check_line(check))
+            out.extend(_check_line(check, explain=explain))
         out.append("")
 
     pending = _pending_dimension_ids(card)
