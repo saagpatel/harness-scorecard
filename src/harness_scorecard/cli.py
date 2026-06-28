@@ -17,6 +17,7 @@ from harness_scorecard.diff import diff_scorecards, render_diff_console, render_
 from harness_scorecard.dispatch import HARNESS_TYPES, select_adapter
 from harness_scorecard.htmlreport import render_html
 from harness_scorecard.models import RUBRIC_VERSION, Grade, grade_rank
+from harness_scorecard.policy import EMPTY_POLICY, POLICY_FILENAME, find_policy, load_policy
 from harness_scorecard.redaction import redact_text
 from harness_scorecard.report import from_dict, render_console, render_json
 from harness_scorecard.sarif import render_sarif
@@ -24,6 +25,7 @@ from harness_scorecard.scoring import score_harness
 
 if TYPE_CHECKING:
     from harness_scorecard.models import Scorecard
+    from harness_scorecard.policy import Policy
 
 
 def _version_string() -> str:
@@ -82,6 +84,13 @@ def _build_parser() -> argparse.ArgumentParser:
         default=Grade.B.value,
         help="Exit non-zero when the harness grades below this band (default: B).",
     )
+    scan.add_argument(
+        "--policy",
+        dest="policy_path",
+        metavar="FILE",
+        help="Policy file (waivers + dispatcher manifest). Default: auto-discover "
+        f"{POLICY_FILENAME} in the harness directory.",
+    )
 
     diff = sub.add_parser(
         "diff",
@@ -105,15 +114,24 @@ def _build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _resolve_policy(root: Path, explicit: str | None) -> Policy:
+    """Load the explicit ``--policy`` file, else auto-discover one in the harness root."""
+    if explicit:
+        return load_policy(Path(explicit).expanduser())
+    discovered = find_policy(root)
+    return load_policy(discovered) if discovered else EMPTY_POLICY
+
+
 def _run_scan(args: argparse.Namespace) -> int:
     root = Path(args.path).expanduser()
     try:
         config, checks = select_adapter(root, args.harness_type)
-    except FileNotFoundError as exc:
+        policy = _resolve_policy(root, args.policy_path)
+    except (FileNotFoundError, ValueError) as exc:
         print(f"error: {redact_text(str(exc))}", file=sys.stderr)
         return 2
 
-    card = score_harness(config, checks)
+    card = score_harness(config, checks, policy)
     output = render_json(card) if args.format == "json" else render_console(card)
     print(output)
 
@@ -133,7 +151,7 @@ def _resolve_scorecard(raw_path: str, harness_type: str) -> Scorecard:
     if path.is_file():
         return from_dict(json.loads(path.read_text(encoding="utf-8")))
     config, checks = select_adapter(path, harness_type)
-    return score_harness(config, checks)
+    return score_harness(config, checks, _resolve_policy(path, None))
 
 
 def _run_diff(args: argparse.Namespace) -> int:

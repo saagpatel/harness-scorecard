@@ -111,9 +111,11 @@ def _make_result(check: CheckResult, harness_type: str, uri: str) -> dict[str, A
     cap = check.triggered_gate_cap
     if cap is not None:
         properties["caps_grade_at"] = cap.value
+    if check.dispatcher_credited:
+        properties["dispatcher_credited"] = True
     if check.evidence:
         properties["evidence"] = [redact_text(item) for item in check.evidence]
-    return {
+    result: dict[str, Any] = {
         "ruleId": check.id,
         "level": _result_level(check),
         "message": {"text": message},
@@ -121,6 +123,13 @@ def _make_result(check: CheckResult, harness_type: str, uri: str) -> dict[str, A
         "partialFingerprints": {"harnessScorecardStableId": _fingerprint(check, harness_type)},
         "properties": properties,
     }
+    if check.waived:
+        # A waived finding stays in the report but is marked suppressed so it doesn't alert --
+        # the SARIF-native way to represent an accepted, triaged finding.
+        result["suppressions"] = [
+            {"kind": "external", "justification": redact_text(check.waiver_reason)}
+        ]
+    return result
 
 
 def to_sarif(card: Scorecard) -> dict[str, Any]:
@@ -151,6 +160,7 @@ def to_sarif(card: Scorecard) -> dict[str, Any]:
                     "harness_type": card.harness_type,
                     "rubric_version": card.rubric_version,
                     "caveats": [redact_text(caveat) for caveat in card.caveats],
+                    "policy_notes": [redact_text(note) for note in card.policy_notes],
                 },
             }
         ],

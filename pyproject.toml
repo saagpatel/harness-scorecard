@@ -85,6 +85,9 @@ ignore = [
     "S108",         # fixture configs use placeholder /tmp roots that are never written
 ]
 "src/harness_scorecard/cli.py" = ["T201"]  # print is the CLI's output channel
+# Policy validation raises ValueError by contract (load_policy promises it; the CLI catches
+# ValueError to exit 2). TRY004's TypeError suggestion would break that catch.
+"src/harness_scorecard/policy.py" = ["TRY004"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

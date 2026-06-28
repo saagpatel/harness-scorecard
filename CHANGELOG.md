@@ -4,6 +4,22 @@ All notable changes to Harness Scorecard are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **Operator policy file (`.harness-scorecard.toml`)** — auto-discovered in the harness directory
+  or passed with `--policy`, with two mechanisms that are always surfaced in the report:
+  - **Waivers** (`[[waiver]]`) accept a known finding with a reason. The waived check is excluded
+    from the grade and its capability-gate cap is suppressed, but it's shown as `[WAIV]` with the
+    reason. Stale waivers (a check that passes or doesn't exist) are reported as policy notes,
+    never silently dropped. In SARIF a waived finding is emitted with a `suppressions` entry so it
+    stays visible but doesn't alert.
+  - **Dispatcher manifest** (`[dispatcher].credits`) credits checks that an opaque dispatcher
+    enforces but the static checks can't see. A declared check that would FAIL is upgraded to
+    PARTIAL (half credit) and marked "dispatcher-credited" — declared, not statically verified.
+- **`examples/harness-scorecard.toml`** — a documented policy-file template.
+
 ## [1.1.0] - 2026-06-28
 
 ### Added

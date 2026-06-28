@@ -104,10 +104,17 @@ class CheckResult:
     gate_cap: Grade | None = None
     remediation: str = ""
     evidence: list[str] = field(default_factory=list)
+    # Set by policy application (see harness_scorecard.policy): a waived finding is excluded from
+    # scoring and its gate cap suppressed; a dispatcher-credited finding is upgraded to PARTIAL.
+    waived: bool = False
+    waiver_reason: str = ""
+    dispatcher_credited: bool = False
 
     @property
     def triggered_gate_cap(self) -> Grade | None:
-        """The cap this check imposes, if it is a gate and it failed."""
+        """The cap this check imposes, if it is a gate and it failed (and is not waived)."""
+        if self.waived:
+            return None
         if self.is_gate and self.status is Status.FAIL:
             return self.gate_cap
         return None
@@ -138,3 +145,6 @@ class Scorecard:
     # Advisory notes that reframe (never change) the grade -- e.g. an opaque hook dispatcher
     # that makes named-guard checks under-credit. See harness_scorecard.caveats.
     caveats: list[str] = field(default_factory=list)
+    # Transparency notes from applying an operator policy file (stale/unnecessary waivers,
+    # unknown dispatcher credits). See harness_scorecard.policy.
+    policy_notes: list[str] = field(default_factory=list)

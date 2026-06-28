@@ -1,0 +1,23 @@
+# Example operator policy file for Harness Scorecard.
+#
+# Place this as `.harness-scorecard.toml` in the harness directory you scan (e.g. ~/.claude),
+# or pass it explicitly with `--policy <file>`. Both mechanisms below are always surfaced in the
+# report -- a policy makes a deliberate decision visible, it never hides a finding silently.
+
+# A waiver accepts a known finding with a reason. The waived check is excluded from the grade and
+# its capability-gate cap (if any) is suppressed, but it is listed in the report as [WAIV] with
+# the reason. A waiver for a check that passes, or for a check id that doesn't exist, is reported
+# as a stale "policy note" rather than silently ignored.
+[[waiver]]
+check = "HS-D1-03"
+reason = "Write-time secret scanning is handled by a pre-commit hook outside the harness."
+
+[[waiver]]
+check = "HS-D6-01"
+reason = "Verification runs in CI, not via a TaskCompleted hook."
+
+# The dispatcher manifest credits checks that a single opaque dispatcher script enforces but the
+# static needle-based checks can't see inside. A declared check that would FAIL is upgraded to
+# PARTIAL (half credit) and marked "dispatcher-credited" -- declared, not statically verified.
+[dispatcher]
+credits = ["HS-D1-02", "HS-D4-03"]

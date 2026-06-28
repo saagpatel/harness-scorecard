@@ -15,9 +15,11 @@ from harness_scorecard.models import (
     CheckResult,
     DimensionResult,
     Scorecard,
+    Status,
     grade_from_score,
     worse_grade,
 )
+from harness_scorecard.policy import EMPTY_POLICY, Policy
 from harness_scorecard.redaction import redact_path
 
 if TYPE_CHECKING:
@@ -39,9 +41,16 @@ class ScorableConfig(Protocol):
         ...
 
 
+def _scores(checks: list[CheckResult]) -> list[tuple[int, float]]:
+    """(weight, score) for each check that counts: applicable (non-N/A) and not waived."""
+    return [
+        (c.weight, c.status.score) for c in checks if c.status.score is not None and not c.waived
+    ]
+
+
 def _weighted_score(checks: list[CheckResult]) -> float:
-    """Weighted average of applicable check scores (N/A checks excluded)."""
-    scored = [(c.weight, c.status.score) for c in checks if c.status.score is not None]
+    """Weighted average of counting check scores (N/A and waived checks excluded)."""
+    scored = _scores(checks)
     total_weight = sum(weight for weight, _ in scored)
     if total_weight == 0:
         return 0.0
@@ -49,8 +58,8 @@ def _weighted_score(checks: list[CheckResult]) -> float:
 
 
 def _dimension_applies(dimension: DimensionResult) -> bool:
-    """A dimension counts toward the overall only if at least one check applied (non-N/A)."""
-    return any(check.status.score is not None for check in dimension.checks)
+    """A dimension counts only if at least one of its checks counts (non-N/A and unwaived)."""
+    return bool(_scores(dimension.checks))
 
 
 def _overall_score(dimensions: list[DimensionResult]) -> float:
@@ -66,16 +75,49 @@ def _overall_score(dimensions: list[DimensionResult]) -> float:
     return sum(dim.weight * dim.score for dim in applicable) / total_weight
 
 
+def _apply_policy(results: list[CheckResult], policy: Policy) -> list[str]:
+    """Apply an operator policy in place. Returns transparency notes for the report.
+
+    Dispatcher credits run first (FAIL -> PARTIAL), then waivers exclude any remaining non-PASS
+    finding. Both surface a note when they target a check that passes or doesn't exist, so a stale
+    policy entry is visible rather than silently inert.
+    """
+    by_id = {result.id: result for result in results}
+    notes: list[str] = []
+    for check_id in policy.dispatcher_credits:
+        result = by_id.get(check_id)
+        if result is None:
+            notes.append(f"dispatcher credit for unknown check {check_id} (ignored)")
+        elif result.status is Status.FAIL:
+            result.status = Status.PARTIAL
+            result.dispatcher_credited = True
+        else:
+            notes.append(f"dispatcher credit for {check_id} is unnecessary (check did not fail)")
+    for check_id, reason in policy.waiver_map.items():
+        result = by_id.get(check_id)
+        if result is None:
+            notes.append(f"waiver for unknown check {check_id} (ignored)")
+        elif result.status is Status.PASS:
+            notes.append(f"waiver for {check_id} is unnecessary (check passes)")
+        else:
+            result.waived = True
+            result.waiver_reason = reason
+    return notes
+
+
 def score_harness(
     config: ScorableConfig,
     checks: Sequence[Check[Any]] = ALL_CHECKS,
+    policy: Policy = EMPTY_POLICY,
 ) -> Scorecard:
     """Grade a parsed harness config against the rubric using the given check set.
 
     ``checks`` defaults to the Claude Code suite; the Codex adapter passes its own. Scored
-    dimensions are derived from the checks that ran, so the engine stays harness-agnostic.
+    dimensions are derived from the checks that ran, so the engine stays harness-agnostic. An
+    optional operator ``policy`` waives accepted findings and credits dispatcher-declared checks.
     """
     results = [check.run(config) for check in checks]
+    policy_notes = _apply_policy(results, policy)
     implemented_ids = list(dict.fromkeys(result.dimension for result in results))
 
     dimensions: list[DimensionResult] = []
@@ -112,4 +154,5 @@ def score_harness(
         dimensions=dimensions,
         gate_caps=gate_caps,
         caveats=list(config.caveats),
+        policy_notes=policy_notes,
     )

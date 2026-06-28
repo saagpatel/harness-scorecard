@@ -33,29 +33,37 @@ def _esc(value: Any) -> str:
 
 
 def _check_row(check: dict[str, Any]) -> str:
-    color = _STATUS_COLOR.get(check["status"], "#6e7781")
+    waived = check.get("waived", False)
+    color = "#6e7781" if waived else _STATUS_COLOR.get(check["status"], "#6e7781")
+    label = "WAIVED" if waived else check["status"].upper()
     gate = (
         f' <span class="gate">GATE&rarr;{_esc(check["gate_cap"])}</span>'
         if check["is_gate"] and check["gate_cap"]
         else ""
     )
-    evidence = "".join(f"<li>{_esc(item)}</li>" for item in check["evidence"])
-    evidence_html = f'<ul class="evidence">{evidence}</ul>' if evidence else ""
-    fix = (
-        f'<div class="fix">fix: {_esc(check["remediation"])}</div>'
-        if check["status"] != "pass" and check["remediation"]
+    credited = (
+        ' <span class="credited">credited via manifest</span>'
+        if check.get("dispatcher_credited")
         else ""
     )
+    evidence = "".join(f"<li>{_esc(item)}</li>" for item in check["evidence"])
+    evidence_html = f'<ul class="evidence">{evidence}</ul>' if evidence else ""
+    if waived:
+        footer = f'<div class="waived">waived: {_esc(check.get("waiver_reason", ""))}</div>'
+    elif check["status"] != "pass" and check["remediation"]:
+        footer = f'<div class="fix">fix: {_esc(check["remediation"])}</div>'
+    else:
+        footer = ""
     return f"""
       <div class="check">
         <div class="check-head">
-          <span class="badge" style="background:{color}">{_esc(check["status"].upper())}</span>
+          <span class="badge" style="background:{color}">{_esc(label)}</span>
           <span class="cid">{_esc(check["id"])}</span>
-          <span class="ctitle">{_esc(check["title"])}</span>{gate}
+          <span class="ctitle">{_esc(check["title"])}</span>{gate}{credited}
         </div>
         <div class="cmsg">{_esc(check["message"])}</div>
         {evidence_html}
-        {fix}
+        {footer}
       </div>"""
 
 
@@ -94,6 +102,11 @@ def render_html(card: Scorecard) -> str:
             f"<ul>{items}</ul></div>"
         )
 
+    policy = ""
+    if data.get("policy_notes"):
+        items = "".join(f"<li>{_esc(note)}</li>" for note in data["policy_notes"])
+        policy = f'<div class="policy"><h3>Policy notes</h3><ul>{items}</ul></div>'
+
     pending = ", ".join(_esc(d) for d in data["pending_dimensions"])
     pending_html = (
         f'<p class="pending">Pending dimensions (specced, not yet scored): {pending}</p>'
@@ -128,6 +141,12 @@ def render_html(card: Scorecard) -> str:
   .caveats h3 {{ margin: 0 0 6px; color: #0969da; font-size: 14px; }}
   .caveats p {{ margin: 0 0 6px; font-size: 13px; color: #57606a; }}
   .caveats ul {{ margin: 0; padding-left: 20px; font-size: 14px; }}
+  .policy {{ background: #fbf1d7; border: 1px solid #eac54f; border-radius: 8px;
+             padding: 12px 16px; margin: 20px 0; }}
+  .policy h3 {{ margin: 0 0 6px; color: #9a6700; font-size: 14px; }}
+  .policy ul {{ margin: 0; padding-left: 20px; font-size: 14px; }}
+  .credited {{ font-size: 11px; font-weight: 700; color: #9a6700; }}
+  .waived {{ font-size: 12px; color: #57606a; font-style: italic; margin: 4px 0 0 2px; }}
   .dim {{ background: #fff; border: 1px solid #d0d7de; border-radius: 8px;
           padding: 12px 18px; margin: 16px 0; }}
   .dim h2 {{ font-size: 16px; margin: 4px 0 12px; display: flex;
@@ -159,6 +178,7 @@ def render_html(card: Scorecard) -> str:
       </div>
     </header>
     {caveats}
+    {policy}
     {gates}
     {dimensions}
     {pending_html}

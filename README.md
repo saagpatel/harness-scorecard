@@ -110,6 +110,25 @@ harness-scorecard diff old.json new.json --format json
 Exit codes: `0` no regression (same or better grade) · `1` grade regressed · `2` invalid input.
 Gate and dimension moves are reported for context; the **letter grade** is what fails the gate.
 
+### Accept known gaps with a policy file
+
+Drop a `.harness-scorecard.toml` in the harness directory (or pass `--policy`) to record decisions
+the grader should respect — always surfaced in the report, never silently hidden:
+
+```toml
+[[waiver]]
+check = "HS-D1-03"
+reason = "Write-time secret scanning is handled by pre-commit, outside the harness."
+
+[dispatcher]
+credits = ["HS-D4-03"]   # checks an opaque dispatcher enforces but static analysis can't see
+```
+
+A **waiver** excludes a finding from the grade (and suppresses its gate cap) but lists it as
+`[WAIV]` with the reason; a stale waiver is flagged, not dropped. The **dispatcher manifest**
+upgrades a declared check from FAIL to PARTIAL — half credit, "declared, not statically verified."
+See [`examples/harness-scorecard.toml`](examples/harness-scorecard.toml).
+
 ## GitHub Action
 
 Grade your harness in CI and upload the findings to code scanning:

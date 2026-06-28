@@ -32,14 +32,46 @@ def _pending_dimension_ids(card: Scorecard) -> list[str]:
 
 def _check_line(check: CheckResult) -> list[str]:
     gate = f"  [GATE->{check.gate_cap.value}]" if check.is_gate and check.gate_cap else ""
+    tag = "WAIV" if check.waived else _STATUS_TAG[check.status]
+    credited = "  (dispatcher-credited)" if check.dispatcher_credited else ""
     lines = [
-        f"      [{_STATUS_TAG[check.status]}] {check.id}  {redact_text(check.title)}{gate}",
+        f"      [{tag}] {check.id}  {redact_text(check.title)}{gate}{credited}",
         f"             {redact_text(check.message)}",
         *(f"             - {redact_text(item)}" for item in check.evidence),
     ]
-    if check.status is not Status.PASS and check.remediation:
+    if check.waived:
+        lines.append(f"             waived: {redact_text(check.waiver_reason)}")
+    elif check.status is not Status.PASS and check.remediation:
         lines.append(f"             fix: {redact_text(check.remediation)}")
     return lines
+
+
+def _waived_checks(card: Scorecard) -> list[CheckResult]:
+    return [check for dim in card.dimensions for check in dim.checks if check.waived]
+
+
+def _credited_checks(card: Scorecard) -> list[CheckResult]:
+    return [check for dim in card.dimensions for check in dim.checks if check.dispatcher_credited]
+
+
+def _policy_summary_lines(card: Scorecard) -> list[str]:
+    """A short 'policy applied' summary plus any stale-policy warnings, or nothing."""
+    out: list[str] = []
+    waived = _waived_checks(card)
+    credited = _credited_checks(card)
+    if waived or credited:
+        parts = []
+        if waived:
+            parts.append(f"{len(waived)} finding(s) waived (excluded from the grade)")
+        if credited:
+            parts.append(f"{len(credited)} credited via dispatcher manifest")
+        out.append(f"  Policy applied: {'; '.join(parts)}.")
+        out.append("")
+    if card.policy_notes:
+        out.append("  Policy notes:")
+        out.extend(f"    ! {redact_text(note)}" for note in card.policy_notes)
+        out.append("")
+    return out
 
 
 def render_console(card: Scorecard) -> str:
@@ -68,6 +100,8 @@ def render_console(card: Scorecard) -> str:
             out.append(f"    - {result.id} caps at {cap_value}  ({result.title})")
         out.append("")
 
+    out.extend(_policy_summary_lines(card))
+
     for dim in card.dimensions:
         out.append(f"  {dim.id}  {dim.name}    {dim.score:.2f}  [weight {dim.weight}]")
         for check in dim.checks:
@@ -92,6 +126,7 @@ def to_dict(card: Scorecard) -> dict[str, Any]:
         "dimensions_total": len(DIMENSIONS),
         "pending_dimensions": _pending_dimension_ids(card),
         "caveats": [redact_text(caveat) for caveat in card.caveats],
+        "policy_notes": [redact_text(note) for note in card.policy_notes],
         "gate_caps": [
             {"id": r.id, "caps_at": r.triggered_gate_cap.value if r.triggered_gate_cap else None}
             for r in card.gate_caps
@@ -115,6 +150,9 @@ def to_dict(card: Scorecard) -> dict[str, Any]:
                         "message": redact_text(c.message),
                         "evidence": [redact_text(e) for e in c.evidence],
                         "remediation": redact_text(c.remediation),
+                        "waived": c.waived,
+                        "waiver_reason": redact_text(c.waiver_reason),
+                        "dispatcher_credited": c.dispatcher_credited,
                     }
                     for c in dim.checks
                 ],
@@ -143,6 +181,9 @@ def _check_from_dict(data: dict[str, Any], dimension_id: str) -> CheckResult:
         gate_cap=Grade(gate_cap) if gate_cap else None,
         remediation=data.get("remediation", ""),
         evidence=list(data.get("evidence", [])),
+        waived=data.get("waived", False),
+        waiver_reason=data.get("waiver_reason", ""),
+        dispatcher_credited=data.get("dispatcher_credited", False),
     )
 
 
@@ -179,6 +220,7 @@ def from_dict(data: dict[str, Any]) -> Scorecard:
             dimensions=dimensions,
             gate_caps=gate_caps,
             caveats=[str(caveat) for caveat in data.get("caveats", [])],
+            policy_notes=[str(note) for note in data.get("policy_notes", [])],
         )
     except (KeyError, TypeError) as exc:
         msg = f"malformed harness-scorecard JSON report: missing or invalid field {exc}"
