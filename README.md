@@ -115,6 +115,19 @@ Pass any paths or globs (`fleet ~/.claude ~/Projects/*/.claude`); each harness i
 its own auto-discovered policy. `--min-grade` (default `B`) exits non-zero if **any** harness is
 below the bar — drop it in CI to keep a whole team's harnesses above a floor.
 
+### Grade badge
+
+Emit a flat SVG badge (colored A green → F red) for a harness repo's README, then regenerate it
+in CI so it can't drift from reality:
+
+```bash
+harness-scorecard scan ~/.claude --badge harness-grade.svg
+```
+
+```markdown
+![harness grade](harness-grade.svg)
+```
+
 ### Track drift over time
 
 `diff` compares two scorecards and reports what changed — which checks flipped, which

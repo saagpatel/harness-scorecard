@@ -14,6 +14,8 @@ All notable changes to Harness Scorecard are documented here. The format follows
   No rolled-up letter grade (averaging A–F is meaningless) — the distribution and the floor are
   shown instead. Console + JSON; `--min-grade` exits non-zero if any harness is below the bar; a
   path that isn't a harness is skipped with a note, never aborting the run.
+- **`scan --badge FILE`** — emit a flat SVG grade badge (colored A green → F red) for a harness
+  repo's README. Dependency-free; carries only the label and the letter, nothing to redact.
 
 ## [1.2.0] - 2026-06-28
 

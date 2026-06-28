@@ -13,6 +13,7 @@ from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from harness_scorecard.badge import render_badge
 from harness_scorecard.diff import diff_scorecards, render_diff_console, render_diff_json
 from harness_scorecard.dispatch import HARNESS_TYPES, select_adapter
 from harness_scorecard.fleet import (
@@ -83,6 +84,12 @@ def _build_parser() -> argparse.ArgumentParser:
         dest="sarif_out",
         metavar="FILE",
         help="Also write a SARIF 2.1.0 report to FILE (for CI / code scanning).",
+    )
+    scan.add_argument(
+        "--badge",
+        dest="badge_out",
+        metavar="FILE",
+        help="Also write a flat SVG grade badge to FILE (for a repo README).",
     )
     scan.add_argument(
         "--min-grade",
@@ -176,6 +183,8 @@ def _run_scan(args: argparse.Namespace) -> int:
         Path(args.html_out).expanduser().write_text(render_html(card), encoding="utf-8")
     if args.sarif_out:
         Path(args.sarif_out).expanduser().write_text(render_sarif(card), encoding="utf-8")
+    if args.badge_out:
+        Path(args.badge_out).expanduser().write_text(render_badge(card), encoding="utf-8")
 
     return 0 if grade_rank(card.grade) >= grade_rank(Grade(args.min_grade)) else 1
 
