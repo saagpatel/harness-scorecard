@@ -24,6 +24,14 @@ All notable changes to Harness Scorecard are documented here. The format follows
   low score reads as "not statically visible," not "insecure." The grade is unchanged — only the
   framing is added. Detection is conservative (explicit `dispatch`/`router`/`run-hooks` idioms on
   tool-gating events), so a normally-named guard is never mislabeled.
+- **`examples/sample-harness/`** — a committed, deliberately-imperfect example harness, scanned in
+  the README's lead "What it looks like" excerpt and reproducible with `scan examples/sample-harness`.
+
+### Fixed
+
+- **Redaction false positive** — ordinary words beginning with a key prefix (`skill-provenance`,
+  `pkcs11`) were mangled to `[redacted-secret]` in reports. Real prefixed keys carry a `-`/`_`
+  separator after the prefix; the matcher now requires it (AWS `AKIA` ids stay matched separately).
 
 ## [1.0.1] - 2026-06-27
 
