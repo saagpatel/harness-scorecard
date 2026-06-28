@@ -4,6 +4,24 @@ All notable changes to Harness Scorecard are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.10.0] - 2026-06-28
+
+### Added
+
+- **Dispatcher introspection now covers the rest of the maskable Claude (HS-*) checks.** Seeded
+  `dispatcher_evidence` on six more checks whose guard can hide behind an opaque dispatcher:
+  inbound-injection sentinels (HS-D3-02), harness config write/read protection (HS-D5-01),
+  hook-integrity verify/self-heal (HS-D5-02), config snapshot/validate (HS-D5-03), tool-call audit
+  logging (HS-D10-01), and the sensitive-read Bash backstop (HS-D1-02). A Claude harness that routes
+  these guards through one dispatcher now gets the same suggest-by-default / `--credit-detected`
+  treatment the destructive-git checks already had. HS-D5-01 is a capability gate, so it is only
+  ever *suggested*, never auto-credited. Rubric unchanged at 1.0.0.
+- Every seeded signature is anchored to a code construct (a named regex/identifier, a call, a path
+  literal, or a guard-name idiom) rather than prose, and a per-pattern test pins the
+  anti-false-credit boundary — a generic verb (`sanitize_path`), a bare file extension
+  (`training_data.jsonl`), or a config path shared with a different guard does not credit a check it
+  doesn't implement.
+
 ## [1.9.0] - 2026-06-28
 
 ### Changed

@@ -1,9 +1,11 @@
 """Tests for dispatcher introspection: evidence detection + its credit/suggest application."""
 
 import json
+import re
 import tempfile
 import unittest
 from pathlib import Path
+from typing import ClassVar
 
 from harness_scorecard.checks import ALL_CHECKS
 from harness_scorecard.checks_codex import CODEX_CHECKS
@@ -42,6 +44,62 @@ from common import injection_signals
 def main(prompt):
     hits = injection_signals(prompt)
     return hits
+"""
+
+# A Claude dispatcher that bundles several guards (injection screen, config-write protection,
+# sensitive-read backstop, force-push block) behind one opaque entrypoint -- the case named-guard
+# detection misses and dispatcher introspection is meant to recover.
+_CLAUDE_DISPATCH = """\
+import re
+
+INJECTION_RE = re.compile(r"ignore (?:all|previous) instructions")
+SENSITIVE_PATH_RE = re.compile(r"\\.ssh|\\.aws|\\.gnupg")
+
+
+def content_sentinel(text):
+    return bool(INJECTION_RE.search(text)) or sanitize(text)
+
+
+def sanitize(text):
+    return text
+
+
+def protect_claude_writes(path):
+    return ".claude/hooks" in path or ".claude/settings" in path
+
+
+def guard(command, tool):
+    if SENSITIVE_PATH_RE.search(command):
+        return "deny", "protect-sensitive-reads triggered"
+    if "git push --force" in command:
+        return "deny", "force-push blocked"
+    return "allow", ""
+"""
+
+# The dispatcher's sibling, where shared integrity/snapshot/audit helpers live.
+_CLAUDE_COMMON = """\
+HOOK_INTEGRITY_MANIFEST = "hooks.sha256"
+
+
+def verify_hook_integrity():
+    return True
+
+
+def harness_self_heal():
+    return True
+
+
+def config_snapshot(path):
+    return path
+
+
+def config_validate(path):
+    return path
+
+
+def append_audit(event):
+    with open("audit.jsonl", "a", encoding="utf-8") as fh:
+        fh.write(event)
 """
 
 
@@ -273,6 +331,31 @@ class TestClaudeCoverage(unittest.TestCase):
         '    return "allow", ""\n'
     )
 
+    @staticmethod
+    def _bundle_harness(root: Path) -> Path:
+        """Write a Claude harness whose only guard is an opaque dispatcher + its sibling."""
+        hooks = root / "hooks"
+        hooks.mkdir()
+        (hooks / "pre_tool_use_dispatch.py").write_text(_CLAUDE_DISPATCH, encoding="utf-8")
+        (hooks / "common.py").write_text(_CLAUDE_COMMON, encoding="utf-8")
+        (root / "settings.json").write_text(
+            json.dumps(
+                {
+                    "permissions": {"defaultMode": "default"},
+                    "hooks": {
+                        "PreToolUse": [
+                            {
+                                "matcher": "Bash",
+                                "hooks": [{"command": "python3 hooks/pre_tool_use_dispatch.py"}],
+                            }
+                        ]
+                    },
+                }
+            ),
+            encoding="utf-8",
+        )
+        return root
+
     def test_credit_detected_lifts_a_failing_claude_check(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -309,6 +392,126 @@ class TestClaudeCoverage(unittest.TestCase):
         by_id = {c.id: c for dim in credited.dimensions for c in dim.checks}
         self.assertIs(by_id["HS-D4-05"].status, Status.PARTIAL)
         self.assertEqual(by_id["HS-D4-05"].credit_source, "detected")
+
+    def test_all_seeded_claude_guards_detected_in_bundle(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._bundle_harness(Path(tmp))
+            found = detect_evidence(
+                root,
+                [_hook("PreToolUse", "python3 hooks/pre_tool_use_dispatch.py")],
+                ALL_CHECKS,
+            )
+        seeded = {"HS-D3-02", "HS-D5-01", "HS-D5-02", "HS-D5-03", "HS-D10-01", "HS-D1-02"}
+        self.assertTrue(seeded.issubset(found), f"missing: {seeded - set(found)}")
+        # The audit guard lives in the sibling common.py, not the dispatcher entrypoint.
+        self.assertIn("common.py", found["HS-D10-01"].location)
+
+    def test_non_gate_guards_suggested_then_credited(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._bundle_harness(Path(tmp))
+            config = load_harness(root)
+            detected = detect_evidence(root, config.hooks, ALL_CHECKS)
+            suggested = score_harness(config, ALL_CHECKS, detected=detected)
+            credited = score_harness(config, ALL_CHECKS, detected=detected, credit_detected=True)
+
+        s_by_id = {c.id: c for dim in suggested.dimensions for c in dim.checks}
+        c_by_id = {c.id: c for dim in credited.dimensions for c in dim.checks}
+        for check_id in ("HS-D3-02", "HS-D5-02", "HS-D5-03", "HS-D10-01", "HS-D1-02"):
+            self.assertIn(check_id, detected)
+            self.assertIs(s_by_id[check_id].status, Status.FAIL)  # suggest-only by default
+            self.assertTrue(any(check_id in note for note in suggested.policy_notes))
+            self.assertIs(c_by_id[check_id].status, Status.PARTIAL)  # credited on opt-in
+            self.assertEqual(c_by_id[check_id].credit_source, "detected")
+
+    def test_config_protection_gate_is_suggested_never_credited(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._bundle_harness(Path(tmp))
+            config = load_harness(root)
+            detected = detect_evidence(root, config.hooks, ALL_CHECKS)
+            self.assertIn("HS-D5-01", detected)  # gate evidence IS found...
+            credited = score_harness(config, ALL_CHECKS, detected=detected, credit_detected=True)
+
+        gate = {c.id: c for dim in credited.dimensions for c in dim.checks}["HS-D5-01"]
+        # ...but a capability gate is never lifted by a source-scan heuristic, even with the flag.
+        self.assertIs(gate.status, Status.FAIL)
+        self.assertNotEqual(gate.credit_source, "detected")
+        self.assertTrue(
+            any("HS-D5-01" in note and "never" in note for note in credited.policy_notes)
+        )
+
+    # Per-pattern oracle: one representative code line per dispatcher_evidence pattern (IN ORDER)
+    # plus look-alike lines that must match NO pattern. This exercises every pattern individually
+    # (a bundle test only proves the first match fires) and pins the anti-false-credit boundary the
+    # 1.9.0 review drew -- a generic verb (sanitize_path), a bare extension (training_data.jsonl),
+    # or a shared path (.claude/hooks for integrity) must not credit a guard it doesn't implement.
+    _PATTERN_ORACLE: ClassVar = {
+        "HS-D3-02": (
+            (
+                "    return content_sentinel(text)",
+                "INJECTION_PATTERNS = [re.compile(p) for p in raw]",
+                "    return sanitize_output(text)",
+            ),
+            ("    x = sanitize_path(cmd)", "contents = sentinel_value", "inject_dependency(svc)"),
+        ),
+        "HS-D5-01": (
+            (
+                "def protect_claude_writes(path):",
+                "    if hook_name == 'protect-files':",
+                "    register('protect-config')",
+            ),
+            ("manifest = open('.claude/hooks/sha256')", "protective_layer = build()"),
+        ),
+        "HS-D5-02": (
+            (
+                "HOOK_INTEGRITY_MANIFEST = 'hooks.sha256'",
+                "def harness_self_heal():",
+                "    integrity_verify(manifest)",
+            ),
+            ("data_integrity_note = 1", "healthy = check_status()"),
+        ),
+        "HS-D5-03": (
+            (
+                "    config_snapshot(path)",
+                "    config_validate(path)",
+                "    snapshot_before_edit(settings)",
+            ),
+            ("snapshot = take_photo()", "validate_user(payload)"),
+        ),
+        "HS-D10-01": (
+            (
+                "def append_audit(event):",
+                "    audit_log.write(line)",
+                "    with open('audit.jsonl', 'a') as fh:",
+            ),
+            ("training_data.jsonl", "appended = audit_helper()"),
+        ),
+        "HS-D1-02": (
+            (
+                "    if '.ssh' in candidate:",
+                "    if '.aws/credentials' in path:",
+                "def protect_sensitive_reads():",
+            ),
+            ("awscli_version = '2'", "protective_reads = 0"),
+        ),
+    }
+
+    def test_each_seeded_pattern_matches_its_construct_not_lookalikes(self) -> None:
+        by_id = {c.id: c for c in ALL_CHECKS}
+        for check_id, (positives, negatives) in self._PATTERN_ORACLE.items():
+            patterns = by_id[check_id].dispatcher_evidence
+            self.assertEqual(
+                len(positives),
+                len(patterns),
+                f"{check_id}: oracle covers {len(positives)} of {len(patterns)} patterns",
+            )
+            compiled = [re.compile(p, re.IGNORECASE) for p in patterns]
+            for regex, sample in zip(compiled, positives, strict=True):
+                self.assertRegex(sample, regex, f"{check_id}: {regex.pattern!r} should match")
+            for neg in negatives:
+                self.assertFalse(
+                    any(regex.search(neg) for regex in compiled),
+                    f"{check_id}: a pattern false-credits on {neg!r}",
+                )
 
 
 if __name__ == "__main__":

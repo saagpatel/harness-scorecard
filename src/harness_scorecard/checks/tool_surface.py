@@ -86,6 +86,11 @@ CHECKS: list[Check] = [
             "Add PostToolUse sentinels on all three inbound vectors: MCP output, "
             "web fetch/search, and file read/grep."
         ),
+        dispatcher_evidence=(
+            r"content[_-]sentinel",
+            r"\binjection[_-]?(?:signal|pattern|guard|screen|re)s?\b",
+            r"\bsanitiz\w*[_-](?:tool|output|input|content|inbound|prompt)\b",
+        ),
     ),
     Check(
         id="HS-D3-03",

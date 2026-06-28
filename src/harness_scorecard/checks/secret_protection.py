@@ -105,6 +105,11 @@ CHECKS: list[Check] = [
         evaluate=_check_sensitive_read_backstop,
         severity=Severity.HIGH,
         remediation="Add a PreToolUse Bash hook that re-blocks reads of sensitive files.",
+        dispatcher_evidence=(
+            r"\.ssh\b",
+            r"\.aws\b",
+            r"protect[_-]?sensitive[_-]?read",
+        ),
     ),
     Check(
         id="HS-D1-03",

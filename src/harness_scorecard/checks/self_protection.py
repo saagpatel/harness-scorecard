@@ -101,6 +101,14 @@ CHECKS: list[Check] = [
             "Guard the harness config on BOTH paths: a PreToolUse Bash write guard and a "
             "PreToolUse Read/Edit/Write file guard over hooks/settings/agents/skills."
         ),
+        # Gate (cap C): introspection only ever *suggests* this; a gate is never auto-credited.
+        # Anchored to protection-verb guard names, not a bare ".claude/" path -- integrity (D5-02)
+        # and snapshot (D5-03) code also reference those paths, so a path alone cross-credits.
+        dispatcher_evidence=(
+            r"protect[_-]?claude",
+            r"protect[_-]?files\b",
+            r"protect[_-]?(?:config|settings)\b",
+        ),
     ),
     Check(
         id="HS-D5-02",
@@ -113,6 +121,11 @@ CHECKS: list[Check] = [
             "Add a SessionStart hook-integrity verification (and a self-heal/regen) so a "
             "disabled or edited guard is detected and repaired."
         ),
+        dispatcher_evidence=(
+            r"(?:hook|harness)[_-]?integrity",
+            r"self[_-]?heal",
+            r"integrity[_-]?(?:verify|regen|check)",
+        ),
     ),
     Check(
         id="HS-D5-03",
@@ -124,6 +137,11 @@ CHECKS: list[Check] = [
         remediation=(
             "Snapshot settings.json before edits and validate it after, so a truncation to a "
             "bypass-accept stub is caught and reversible."
+        ),
+        dispatcher_evidence=(
+            r"config[_-]?snapshot",
+            r"config[_-]?validate",
+            r"snapshot[_-]?before[_-]?edit",
         ),
     ),
 ]

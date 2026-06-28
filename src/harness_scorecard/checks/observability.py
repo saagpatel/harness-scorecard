@@ -52,6 +52,11 @@ CHECKS: list[Check] = [
         evaluate=_check_tool_audit_logging,
         severity=Severity.MEDIUM,
         remediation="Add PostToolUse audit-log hooks on both the Bash and mcp__.* lanes.",
+        dispatcher_evidence=(
+            r"\bappend\w*audit\b",
+            r"\baudit[_-]?log\b",
+            r"audit[\w-]*\.jsonl\b",
+        ),
     ),
     Check(
         id="HS-D10-02",
