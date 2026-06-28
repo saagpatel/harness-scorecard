@@ -257,6 +257,19 @@ merge:
 A complete workflow — permissions, weekly scheduling, SARIF upload — is in
 [`examples/github-workflow.yml`](examples/github-workflow.yml).
 
+### Inline failure modes in the run summary
+
+Put the grade and every failing finding — each with its red-team failure mode and the fix —
+straight on the workflow run page, so a red check explains itself without anyone opening the
+logs:
+
+```yaml
+- run: harness-scorecard scan .claude --summary "$GITHUB_STEP_SUMMARY" --min-grade B
+```
+
+`--summary` appends GitHub-flavored Markdown, so it's safe alongside other steps that write to
+the run summary. The console report still goes to the step log; the Markdown goes to the summary.
+
 ## Guarantees
 
 - **Read-only.** It never writes to the harness it audits.

@@ -4,6 +4,24 @@ All notable changes to Harness Scorecard are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.0] - 2026-06-28
+
+### Added
+
+- **`scan --summary FILE`** — writes a GitHub-flavored Markdown report (grade headline, a
+  capability-gates-tripped table, and every failing finding with its red-team failure mode and
+  fix) suitable for a CI step summary. Point it at `$GITHUB_STEP_SUMMARY` and a red check
+  explains itself on the PR's run page — no log-diving:
+
+  ```yaml
+  - run: harness-scorecard scan .claude --summary "$GITHUB_STEP_SUMMARY" --min-grade B
+  ```
+
+  A side-output like `--html`/`--sarif`/`--badge`, but it **appends** (the step summary
+  accumulates across job steps) and draws its "why" from the same in-package narrative registry
+  as `explain` / `scan --explain`. Table cells and blockquotes are escaped so a finding can't
+  break the Markdown. The rubric is unchanged at **1.0.0**.
+
 ## [1.6.0] - 2026-06-28
 
 ### Added

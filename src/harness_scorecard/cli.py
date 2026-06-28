@@ -35,6 +35,7 @@ from harness_scorecard.redaction import redact_text
 from harness_scorecard.report import from_dict, render_console, render_json
 from harness_scorecard.sarif import render_sarif
 from harness_scorecard.scoring import score_harness
+from harness_scorecard.summary import render_github_summary
 
 if TYPE_CHECKING:
     from harness_scorecard.models import Scorecard
@@ -96,6 +97,13 @@ def _build_parser() -> argparse.ArgumentParser:
         dest="badge_out",
         metavar="FILE",
         help="Also write a flat SVG grade badge to FILE (for a repo README).",
+    )
+    scan.add_argument(
+        "--summary",
+        dest="summary_out",
+        metavar="FILE",
+        help="Also write a GitHub-flavored Markdown summary to FILE "
+        '(e.g. "$GITHUB_STEP_SUMMARY" in CI).',
     )
     scan.add_argument(
         "--explain",
@@ -214,6 +222,13 @@ def _run_scan(args: argparse.Namespace) -> int:
         Path(args.sarif_out).expanduser().write_text(render_sarif(card), encoding="utf-8")
     if args.badge_out:
         Path(args.badge_out).expanduser().write_text(render_badge(card), encoding="utf-8")
+    if args.summary_out:
+        # Append, not overwrite: $GITHUB_STEP_SUMMARY accumulates across job steps. Separate
+        # from any prior step's content with a blank line, but only when there is some.
+        summary_path = Path(args.summary_out).expanduser()
+        prefix = "\n" if summary_path.exists() and summary_path.stat().st_size > 0 else ""
+        with summary_path.open("a", encoding="utf-8") as handle:
+            handle.write(prefix + render_github_summary(card))
 
     return 0 if grade_rank(card.grade) >= grade_rank(Grade(args.min_grade)) else 1
 
