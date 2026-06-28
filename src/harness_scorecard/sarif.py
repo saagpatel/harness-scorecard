@@ -150,6 +150,7 @@ def to_sarif(card: Scorecard) -> dict[str, Any]:
                     "overall_score": round(card.overall_score, 4),
                     "harness_type": card.harness_type,
                     "rubric_version": card.rubric_version,
+                    "caveats": [redact_text(caveat) for caveat in card.caveats],
                 },
             }
         ],

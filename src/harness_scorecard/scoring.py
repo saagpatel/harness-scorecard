@@ -33,6 +33,11 @@ class ScorableConfig(Protocol):
     root: Path
     harness_type: str
 
+    @property
+    def caveats(self) -> list[str]:
+        """Advisory notes that reframe the grade (e.g. an opaque dispatcher under-crediting)."""
+        ...
+
 
 def _weighted_score(checks: list[CheckResult]) -> float:
     """Weighted average of applicable check scores (N/A checks excluded)."""
@@ -106,4 +111,5 @@ def score_harness(
         grade=grade,
         dimensions=dimensions,
         gate_caps=gate_caps,
+        caveats=list(config.caveats),
     )

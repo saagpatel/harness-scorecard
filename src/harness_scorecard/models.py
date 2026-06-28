@@ -135,3 +135,6 @@ class Scorecard:
     grade: Grade
     dimensions: list[DimensionResult]
     gate_caps: list[CheckResult] = field(default_factory=list)
+    # Advisory notes that reframe (never change) the grade -- e.g. an opaque hook dispatcher
+    # that makes named-guard checks under-credit. See harness_scorecard.caveats.
+    caveats: list[str] = field(default_factory=list)

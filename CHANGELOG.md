@@ -18,6 +18,12 @@ All notable changes to Harness Scorecard are documented here. The format follows
   fails the job on any grade regression, so a PR that weakens the harness can't merge.
 - **`report.from_dict()`** — reconstructs a `Scorecard` from a saved JSON report (the inverse of
   `to_dict()`), with a clear `ValueError` on malformed input.
+- **Dispatcher caveats in the report** — when a harness routes tool events through an opaque hook
+  dispatcher (e.g. `pre_tool_use_dispatch.py`), the named-guard checks can't see inside it and
+  under-credit. The report now surfaces a caveat in every format (console, JSON, HTML, SARIF) so a
+  low score reads as "not statically visible," not "insecure." The grade is unchanged — only the
+  framing is added. Detection is conservative (explicit `dispatch`/`router`/`run-hooks` idioms on
+  tool-gating events), so a normally-named guard is never mislabeled.
 
 ## [1.0.1] - 2026-06-27
 

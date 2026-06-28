@@ -361,11 +361,14 @@ surface offers.
 - **CDX-D10-02 — Turn completion observable (1, STATIC)**: `notify` configured (PASS) or a
   `Stop` hook (PARTIAL).
 
-> **Static-analysis limit (Codex dispatcher pattern):** a harness that routes every hook through
+> **Static-analysis limit (opaque dispatcher pattern):** a harness that routes every hook through
 > one opaque dispatcher (e.g. `pre_tool_use_dispatch.py`) hides its security logic from
 > config-only inspection, so the needle-based checks under-credit it. This is the honest boundary
 > of static grading — explicit, conventionally-named guards grade higher because they are
-> auditable.
+> auditable. The grader **surfaces this in the report itself**: when it detects a dispatcher idiom
+> (`dispatch`, `router`, `run-hooks`, …) on a tool-gating event in either harness, it emits a
+> **caveat** in every output format so a low score on the affected checks reads as "not statically
+> visible," not "insecure." The caveat reframes the grade; it never changes it.
 
 ## 7. Privacy & redaction
 

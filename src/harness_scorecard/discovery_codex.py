@@ -19,6 +19,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from harness_scorecard.caveats import detect_dispatcher_caveats
 from harness_scorecard.parsing import (
     HookEntry,
     event_present,
@@ -157,6 +158,11 @@ class CodexConfig:
     def has_event(self, event: str) -> bool:
         """True when at least one hook is registered under ``event`` (any matcher)."""
         return event_present(self.hooks, event)
+
+    @property
+    def caveats(self) -> list[str]:
+        """Advisory notes that reframe the grade (e.g. an opaque hook dispatcher)."""
+        return detect_dispatcher_caveats(self.hooks)
 
 
 def _read_toml(path: Path) -> dict[str, Any]:

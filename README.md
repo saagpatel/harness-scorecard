@@ -23,6 +23,11 @@ globs plus the PreToolUse hooks. See [`docs/rubric.md`](docs/rubric.md) for the 
 including **capability gates** that cap the grade when a critical hole is present (you can't
 score an A with readable credentials, no matter how many cheap checks pass).
 
+It's honest about its own limits, too. A harness that funnels every guard through one opaque
+dispatcher script hides its logic from static analysis, so the named-guard checks under-credit
+it. Rather than silently mark it down, the report emits a **caveat** — "a low score here may be
+a static-analysis limit, not a missing guard" — so the grade is never misread as "insecure."
+
 ## Usage
 
 ```bash

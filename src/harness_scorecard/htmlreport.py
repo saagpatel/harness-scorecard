@@ -84,6 +84,16 @@ def render_html(card: Scorecard) -> str:
         )
         gates = f'<div class="gates"><h3>Capability gates tripped</h3><ul>{items}</ul></div>'
 
+    caveats = ""
+    if data["caveats"]:
+        items = "".join(f"<li>{_esc(caveat)}</li>" for caveat in data["caveats"])
+        caveats = (
+            '<div class="caveats"><h3>Caveats</h3>'
+            "<p>A low score on an affected check may be a static-analysis limit, "
+            "not a missing guard.</p>"
+            f"<ul>{items}</ul></div>"
+        )
+
     pending = ", ".join(_esc(d) for d in data["pending_dimensions"])
     pending_html = (
         f'<p class="pending">Pending dimensions (specced, not yet scored): {pending}</p>'
@@ -113,6 +123,11 @@ def render_html(card: Scorecard) -> str:
             padding: 12px 16px; margin: 20px 0; }}
   .gates h3 {{ margin: 0 0 6px; color: #cf222e; font-size: 14px; }}
   .gates ul {{ margin: 0; padding-left: 20px; font-size: 14px; }}
+  .caveats {{ background: #ddf4ff; border: 1px solid #b6e3ff; border-radius: 8px;
+              padding: 12px 16px; margin: 20px 0; }}
+  .caveats h3 {{ margin: 0 0 6px; color: #0969da; font-size: 14px; }}
+  .caveats p {{ margin: 0 0 6px; font-size: 13px; color: #57606a; }}
+  .caveats ul {{ margin: 0; padding-left: 20px; font-size: 14px; }}
   .dim {{ background: #fff; border: 1px solid #d0d7de; border-radius: 8px;
           padding: 12px 18px; margin: 16px 0; }}
   .dim h2 {{ font-size: 16px; margin: 4px 0 12px; display: flex;
@@ -143,6 +158,7 @@ def render_html(card: Scorecard) -> str:
           scored {data["dimensions_scored"]} of {data["dimensions_total"]} dimensions</div>
       </div>
     </header>
+    {caveats}
     {gates}
     {dimensions}
     {pending_html}

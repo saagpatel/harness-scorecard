@@ -55,6 +55,11 @@ def render_console(card: Scorecard) -> str:
     )
     out.append("")
 
+    if card.caveats:
+        out.append("  Caveats (a low score below may be a static-analysis limit, not a gap):")
+        out.extend(f"    * {redact_text(caveat)}" for caveat in card.caveats)
+        out.append("")
+
     if card.gate_caps:
         out.append("  Capability gates tripped (grade capped):")
         for result in card.gate_caps:
@@ -86,6 +91,7 @@ def to_dict(card: Scorecard) -> dict[str, Any]:
         "dimensions_scored": len(card.dimensions),
         "dimensions_total": len(DIMENSIONS),
         "pending_dimensions": _pending_dimension_ids(card),
+        "caveats": [redact_text(caveat) for caveat in card.caveats],
         "gate_caps": [
             {"id": r.id, "caps_at": r.triggered_gate_cap.value if r.triggered_gate_cap else None}
             for r in card.gate_caps
@@ -172,6 +178,7 @@ def from_dict(data: dict[str, Any]) -> Scorecard:
             grade=Grade(data["grade"]),
             dimensions=dimensions,
             gate_caps=gate_caps,
+            caveats=[str(caveat) for caveat in data.get("caveats", [])],
         )
     except (KeyError, TypeError) as exc:
         msg = f"malformed harness-scorecard JSON report: missing or invalid field {exc}"
