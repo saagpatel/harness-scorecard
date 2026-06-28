@@ -4,6 +4,24 @@ All notable changes to Harness Scorecard are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0] - 2026-06-28
+
+### Added
+
+- **`explain <CHECK_ID>` command** — bridges a scan finding to its rationale. Given any check id
+  (`HS-D4-01`, `CDX-D1-01`, …, case-insensitive) it prints the check's metadata, the documented
+  red-team **failure mode** it guards against, the **remediation**, and — for the six capability
+  gates — a pointer to the vulnerable/guarded **proof** pair in `examples/redteam/`. `--format
+  json` emits the same content for tooling; an unknown id exits 2 with the list of valid ids.
+- **Failure-mode registry (`failure_modes.py`)** — a threat narrative for *every* check, keyed by
+  its stable id and shipped in-package (so `explain` works from an installed wheel, where
+  `docs/` and `examples/` are not present). A meta-test asserts the registry covers exactly the
+  registered checks, so a new check can't ship without a narrative and a retired id can't leave a
+  dangling entry.
+
+Read-only and pure: `explain` reads the in-code check catalog and narrative registry, never the
+audited harness. The rubric is unchanged at **1.0.0**.
+
 ## [1.4.0] - 2026-06-28
 
 ### Added

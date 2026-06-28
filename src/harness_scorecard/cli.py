@@ -16,6 +16,12 @@ from typing import TYPE_CHECKING
 from harness_scorecard.badge import render_badge
 from harness_scorecard.diff import diff_scorecards, render_diff_console, render_diff_json
 from harness_scorecard.dispatch import HARNESS_TYPES, select_adapter
+from harness_scorecard.explain import (
+    all_check_ids,
+    find_check,
+    render_explain_console,
+    render_explain_json,
+)
 from harness_scorecard.fleet import (
     FleetError,
     FleetReport,
@@ -153,6 +159,21 @@ def _build_parser() -> argparse.ArgumentParser:
         default=Grade.B.value,
         help="Exit non-zero if any graded harness is below this band (default: B).",
     )
+
+    explain = sub.add_parser(
+        "explain",
+        help="Explain one check: its failure mode, the fix, and (for gates) the red-team proof.",
+    )
+    explain.add_argument(
+        "check_id",
+        help="A check id to explain, e.g. HS-D4-01 or CDX-D1-01 (case-insensitive).",
+    )
+    explain.add_argument(
+        "--format",
+        choices=["console", "json"],
+        default="console",
+        help="Output format for stdout (default: console).",
+    )
     return parser
 
 
@@ -237,6 +258,24 @@ def _run_fleet(args: argparse.Namespace) -> int:
     return 1 if any(grade_rank(card.grade) < bar for card in cards) else 0
 
 
+def _run_explain(args: argparse.Namespace) -> int:
+    check = find_check(args.check_id)
+    if check is None:
+        ids = all_check_ids()
+        claude = [cid for cid in ids if cid.startswith("HS-")]
+        codex = [cid for cid in ids if cid.startswith("CDX-")]
+        print(
+            f"error: unknown check id {args.check_id!r} ({len(ids)} checks available)",
+            file=sys.stderr,
+        )
+        print(f"  Claude Code: {', '.join(claude)}", file=sys.stderr)
+        print(f"  Codex:       {', '.join(codex)}", file=sys.stderr)
+        return 2
+    output = render_explain_json(check) if args.format == "json" else render_explain_console(check)
+    print(output)
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = _build_parser()
     args = parser.parse_args(argv)
@@ -246,6 +285,8 @@ def main(argv: list[str] | None = None) -> int:
         return _run_diff(args)
     if args.command == "fleet":
         return _run_fleet(args)
+    if args.command == "explain":
+        return _run_explain(args)
     parser.print_help()
     return 2
 

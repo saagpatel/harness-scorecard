@@ -113,6 +113,36 @@ harness-scorecard scan ~/.claude --sarif harness.sarif --min-grade C
 `--min-grade {A,B,C,D,F}` sets the bar (default `B`). Exit codes: `0` meets the bar ·
 `1` below the bar · `2` no harness found.
 
+### Explain a finding
+
+A scan tells you `HS-D4-01 FAIL`. `explain` tells you *why that matters* and how to fix it —
+the documented red-team failure mode behind any check, straight from the CLI:
+
+```text
+$ harness-scorecard explain HS-D4-01
+HS-D4-01  ·  Push to protected branch effectively blocked
+D4 — Destructive-action & git safety  ·  weight 5  ·  critical  ·  static
+GATE: a failing result caps the grade at C.
+
+Why it matters
+  A config that declares 'never push to main' only in autoMode.hard_deny does nothing
+  under bypassPermissions (hard_deny is inert), so the agent or an injection pushes
+  straight to a protected branch.
+
+How to fix it
+  Block push to main/master via a PreToolUse Bash hook or a deny entry (not hard_deny
+  alone under bypass).
+
+Proof it's caught
+  writeup:  examples/redteam/claude-d4-inert-harddeny/ATTACK.md
+  FAIL it:  harness-scorecard scan examples/redteam/claude-d4-inert-harddeny/vulnerable
+  PASS it:  harness-scorecard scan examples/redteam/claude-d4-inert-harddeny/guarded
+```
+
+For the six capability gates, `explain` points at the red-team corpus pair that proves the
+check. Works for any check id (`HS-*` or `CDX-*`, case-insensitive); `--format json` emits the
+same content for tooling.
+
 ### Grade your whole machine
 
 `fleet` grades several harnesses at once and reports the distribution and the worst offender —
