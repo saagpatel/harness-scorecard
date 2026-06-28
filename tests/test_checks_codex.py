@@ -59,6 +59,30 @@ class TestCodexFixtures(unittest.TestCase):
             self.assertEqual(get_check(cid).run(config).status, Status.FAIL, cid)
 
 
+class TestD4TrustedProjectBreadth(unittest.TestCase):
+    def _run(self, **overrides: object) -> Status:
+        return get_check("CDX-D4-04").run(make_codex_config(**overrides)).status
+
+    def test_no_trusted_projects_passes(self) -> None:
+        self.assertEqual(self._run(trusted_projects=[]), Status.PASS)
+
+    def test_bounded_set_passes(self) -> None:
+        self.assertEqual(self._run(trusted_projects=[f"/p/{i}" for i in range(10)]), Status.PASS)
+
+    def test_large_set_is_partial(self) -> None:
+        self.assertEqual(self._run(trusted_projects=[f"/p/{i}" for i in range(50)]), Status.PARTIAL)
+
+    def test_very_broad_set_fails(self) -> None:
+        self.assertEqual(self._run(trusted_projects=[f"/p/{i}" for i in range(150)]), Status.FAIL)
+
+    def test_na_when_approval_already_disabled_globally(self) -> None:
+        # approval_policy=never removes the gate everywhere, so trust_level breadth is moot.
+        status = self._run(
+            approval_policy="never", trusted_projects=[f"/p/{i}" for i in range(150)]
+        )
+        self.assertEqual(status, Status.NOT_APPLICABLE)
+
+
 class TestD1SecretProtection(unittest.TestCase):
     def test_env_gate_fails_when_default_excludes_disabled(self) -> None:
         config = make_codex_config(env_ignore_default_excludes=True)

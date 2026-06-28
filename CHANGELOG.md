@@ -19,6 +19,10 @@ All notable changes to Harness Scorecard are documented here. The format follows
     enforces but the static checks can't see. A declared check that would FAIL is upgraded to
     PARTIAL (half credit) and marked "dispatcher-credited" — declared, not statically verified.
 - **`examples/harness-scorecard.toml`** — a documented policy-file template.
+- **Codex check `CDX-D4-04` — trusted-project breadth** — counts `[projects.*].trust_level =
+  "trusted"` entries (each suppresses approval prompts in its directory): a bounded set passes,
+  >25 is PARTIAL, >100 FAIL; N/A when `approval_policy = "never"` already removes the gate
+  globally. Catches an approval floor quietly eroded across hundreds of trusted directories.
 
 ## [1.1.0] - 2026-06-28
 

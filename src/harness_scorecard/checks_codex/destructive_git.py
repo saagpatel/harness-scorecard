@@ -8,7 +8,14 @@ i.e. ``approval_policy = "never"`` and ``sandbox_mode = "danger-full-access"`` w
 
 from __future__ import annotations
 
-from harness_scorecard.checks.base import Check, CheckOutcome, failed, partial, passed
+from harness_scorecard.checks.base import (
+    Check,
+    CheckOutcome,
+    failed,
+    not_applicable,
+    partial,
+    passed,
+)
 from harness_scorecard.discovery_codex import APPROVAL_NEVER, CodexConfig
 from harness_scorecard.models import Detectability, Grade, Severity
 
@@ -16,6 +23,11 @@ from harness_scorecard.models import Detectability, Grade, Severity
 # (push-notification, aws-safety-logger, "legitimate" containing "git", etc.).
 _GIT_HOOK_NEEDLES = ("git-safety", "git-guard", "force-push", "destructive")
 _GATED_APPROVALS = ("untrusted", "on-request")
+
+# trust_level=trusted suppresses approval prompts inside a directory. A handful of trusted
+# project roots is a normal, bounded choice; a large set erodes the approval gate broadly.
+_TRUST_PARTIAL_THRESHOLD = 25
+_TRUST_FAIL_THRESHOLD = 100
 
 
 def _has_bash_git_guard(config: CodexConfig) -> bool:
@@ -63,6 +75,35 @@ def _approval_granularity(config: CodexConfig) -> CheckOutcome:
     return partial(f"Unrecognized approval_policy={policy!r}; cannot confirm it gates actions.")
 
 
+def _trusted_project_breadth(config: CodexConfig) -> CheckOutcome:
+    if config.approval_disabled:
+        return not_applicable(
+            "approval_policy=never already removes the approval gate globally, so per-project "
+            "trust_level adds no further erosion.",
+        )
+    trusted = config.trusted_projects
+    count = len(trusted)
+    if count == 0:
+        return passed("No projects set trust_level=trusted; the approval gate applies everywhere.")
+    sample = [f"trusted: {path}" for path in trusted[:3]]
+    if count > _TRUST_FAIL_THRESHOLD:
+        return failed(
+            f"{count} projects are marked trust_level=trusted; the approval gate is eroded across "
+            f"a very broad set of directories.",
+            sample,
+        )
+    if count > _TRUST_PARTIAL_THRESHOLD:
+        return partial(
+            f"{count} projects are trust_level=trusted; each suppresses approval prompts in its "
+            f"directory. Prune the set to the few you genuinely trust.",
+            sample,
+        )
+    return passed(
+        f"A bounded set of {count} trusted project(s); the approval gate still applies elsewhere.",
+        sample,
+    )
+
+
 CHECKS: list[Check[CodexConfig]] = [
     Check(
         id="CDX-D4-01",
@@ -102,6 +143,19 @@ CHECKS: list[Check[CodexConfig]] = [
         remediation=(
             "Set approval_policy to 'on-request' or 'untrusted' so commands are gated before "
             "they run."
+        ),
+    ),
+    Check(
+        id="CDX-D4-04",
+        dimension="D4",
+        title="Trusted-project breadth is bounded",
+        weight=2,
+        evaluate=_trusted_project_breadth,
+        severity=Severity.MEDIUM,
+        detectability=Detectability.STATIC,
+        remediation=(
+            "Prune [projects.*] entries with trust_level='trusted' to the few directories you "
+            "genuinely trust; each one suppresses approval prompts in that directory."
         ),
     ),
 ]
