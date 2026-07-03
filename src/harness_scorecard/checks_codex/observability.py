@@ -7,6 +7,7 @@ turn-completion signal (the ``notify`` command, or at least a Stop hook) surface
 from __future__ import annotations
 
 from harness_scorecard.checks.base import Check, CheckOutcome, failed, partial, passed
+from harness_scorecard.checks.receipt_discipline import RECEIPT_DISCIPLINE_CHECK
 from harness_scorecard.discovery_codex import CodexConfig
 from harness_scorecard.models import Detectability, Severity
 
@@ -61,4 +62,5 @@ CHECKS: list[Check[CodexConfig]] = [
             "Configure a notify command (or at least a Stop hook) to surface turn completion."
         ),
     ),
+    RECEIPT_DISCIPLINE_CHECK,
 ]

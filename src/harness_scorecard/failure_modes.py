@@ -151,6 +151,10 @@ FAILURE_MODES: dict[str, str] = {
         "Silent failures and denials leave no trail, because there are no PermissionDenied / "
         "PostToolUseFailure / StopFailure log hooks."
     ),
+    "HS-D10-03": (
+        "A peer-agent branch carries commits ahead of main, but no bridge-db activity row names "
+        "that branch, so the writing task has no durable proof receipt."
+    ),
     # --- Codex (CDX-*) -------------------------------------------------------------------------
     # D1 — Secret protection
     "CDX-D1-01": (

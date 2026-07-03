@@ -4,6 +4,16 @@ All notable changes to Harness Scorecard are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **HS-D10-03 peer-agent branch receipt discipline.** The scorer now uses read-only git and
+  bridge-db access to flag `codex/*` or `cc/*` branches that have commits ahead of `main` but no
+  matching `activity_log.branch` receipt for the repo. The check is suggest-only, non-gating, and
+  shared with the Codex adapter because it grades repo proof receipts rather than harness syntax.
+  Rubric bumped to 1.1.0.
+
 ## [1.11.0] - 2026-06-28
 
 ### Added
