@@ -224,6 +224,13 @@ harness shows in config. *Failure mode* = the documented incident it guards agai
 - **HS-D5-03 — Config snapshot/validate around edits (3, STATIC)**: snapshot-before-mutate +
   post-edit validation of `settings.json`. FM: settings.json silently truncates to a
   bypass-accept stub with no backup.
+- **HS-D5-04 — Stated hard guarantees have enforcement backing (4, PARTIAL)**: every
+  hard-deny-class claim in the rules prose (CLAUDE.md, `rules/*.md`) has a hook deny set
+  or `permissions.deny` glob backing it under the **active** mode; N/A (never penalized)
+  when the prose states no hard guarantees. FM: the rules promise a block ("never read
+  ~/.ssh") that nothing enforces — prose is instruction, not enforcement. PARTIAL
+  detectability: claim extraction and matching are heuristic; the full per-claim ledger
+  (with logic-guard candidates for manual review) is `harness-scorecard claims <path>`.
 
 ### D6 — Verification gates (weight 3)
 

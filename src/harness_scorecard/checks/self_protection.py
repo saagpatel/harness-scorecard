@@ -6,9 +6,17 @@ of the config surface, hook-integrity verification, and snapshot/validate around
 
 from __future__ import annotations
 
-from harness_scorecard.checks.base import Check, CheckOutcome, failed, partial, passed
+from harness_scorecard.checks.base import (
+    Check,
+    CheckOutcome,
+    failed,
+    not_applicable,
+    partial,
+    passed,
+)
+from harness_scorecard.claims import ENFORCED_STATUSES, ClaimStatus, audit_claims
 from harness_scorecard.discovery import HarnessConfig
-from harness_scorecard.models import Grade, Severity
+from harness_scorecard.models import Detectability, Grade, Severity
 
 
 def _has_write_protection(config: HarnessConfig) -> bool:
@@ -87,6 +95,40 @@ def _check_config_snapshot(config: HarnessConfig) -> CheckOutcome:
     )
 
 
+def _check_stated_guarantees(config: HarnessConfig) -> CheckOutcome:
+    report = audit_claims(config)
+    hard = [f for f in report.findings if f.claim.hard_deny]
+    if not hard:
+        return not_applicable(
+            "The rules prose states no hard guarantees; nothing to verify. A harness "
+            "must never score worse for documenting its rules."
+        )
+    backed = [f for f in hard if f.status in ENFORCED_STATUSES]
+    prose_only = [f for f in hard if f.status is ClaimStatus.PROSE_ONLY]
+    pending = [f for f in hard if f.status is ClaimStatus.CANDIDATE_LOGIC]
+    if not prose_only and not pending:
+        return passed(
+            f"All {len(hard)} stated hard guarantees have enforcement backing under "
+            f"mode {config.default_mode}.",
+            evidence=[f"{f.claim.source}: {f.status.value}" for f in hard],
+        )
+    if not backed and prose_only:
+        return failed(
+            "Stated hard guarantees have no surviving enforcement under "
+            f"mode {config.default_mode} — the rules promise blocks that nothing backs.",
+            evidence=[f"{f.claim.source}: prose-only — {f.claim.text[:80]}" for f in prose_only],
+        )
+    evidence = [f"{f.claim.source}: prose-only — {f.claim.text[:80]}" for f in prose_only]
+    evidence.extend(
+        f"{f.claim.source}: logic-guard candidate, needs manual review" for f in pending
+    )
+    return partial(
+        f"{len(backed)}/{len(hard)} stated hard guarantees are backed; "
+        f"{len(prose_only)} prose-only, {len(pending)} pending manual review.",
+        evidence=evidence,
+    )
+
+
 CHECKS: list[Check] = [
     Check(
         id="HS-D5-01",
@@ -142,6 +184,22 @@ CHECKS: list[Check] = [
             r"config[_-]?snapshot",
             r"config[_-]?validate",
             r"snapshot[_-]?before[_-]?edit",
+        ),
+    ),
+    Check(
+        id="HS-D5-04",
+        dimension="D5",
+        title="Stated hard guarantees have enforcement backing",
+        weight=4,
+        evaluate=_check_stated_guarantees,
+        severity=Severity.HIGH,
+        # PARTIAL detectability: claim extraction and token matching are heuristic; the
+        # full per-claim ledger (with manual-review candidates) is the `claims` subcommand.
+        detectability=Detectability.PARTIAL,
+        remediation=(
+            "For every prose-only hard guarantee, add real backing under the active mode: "
+            "a permissions.deny glob or a PreToolUse deny hook. Run "
+            "`harness-scorecard claims <path>` for the per-claim ledger."
         ),
     ),
 ]

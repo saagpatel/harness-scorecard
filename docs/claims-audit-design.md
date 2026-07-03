@@ -1,6 +1,8 @@
 # Claims Audit — Design
 
-**Status:** design accepted, implementation not started.
+**Status:** implemented (engine `guard_extract.py` + `claims.py`, `claims` subcommand,
+check HS-D5-04, rubric 1.2.0). The check id landed as HS-D5-04 — the next free D5 slot —
+rather than the HS-D5-06 this draft originally penciled in; nothing reserves 04/05.
 **Lineage:** the Harness Enforcement Auditor lane (scoped 2026-06-27, spikes passed
 2026-07-03) rehomed into this repo. Feasibility evidence: both spike verdicts in the
 operator vault (`wiki/audits/hea-spike-verdict-2026-07-03.md`) — guard-body extraction
@@ -51,7 +53,7 @@ STYLE             testing.md:38     Do NOT use waitForTimeout ...
 
 ### 2. One new rubric check, no new dimension
 
-`HS-D5-06 — Stated hard guarantees have enforcement backing` (D5, harness
+`HS-D5-04 — Stated hard guarantees have enforcement backing` (D5, harness
 self-protection & integrity):
 
 - **PASS** — every hard-deny-class claim in the rules files has hook or deny backing.
@@ -149,11 +151,11 @@ security posture; same reason spike artifacts stayed out of this repo).
   logic-only guard + matching claim → `candidate_logic`, never enforced.
 - Mode-awareness: same claim set under `auto` vs `bypassPermissions` — hard_deny
   backing flips.
-- HS-D5-06: no-claims harness → N/A not penalized; one prose-only hard guarantee → FAIL.
+- HS-D5-04: no-claims harness → N/A not penalized; one prose-only hard guarantee → FAIL.
 
 ## Phasing
 
-- **Phase 1 (this design):** Claude Code harnesses, `claims` subcommand + HS-D5-06,
+- **Phase 1 (this design):** Claude Code harnesses, `claims` subcommand + HS-D5-04,
   rubric bump, README + rubric.md sections.
 - **Phase 2:** Codex (AGENTS.md prose + config.toml/hooks.json backing) via the
   existing `discovery_codex` adapter; CDX check mirror.

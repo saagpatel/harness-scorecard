@@ -1,5 +1,6 @@
 """D5 - Harness self-protection & integrity checks."""
 
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -7,14 +8,15 @@ from harness_scorecard.checks import ALL_CHECKS
 from harness_scorecard.discovery import HookEntry, load_harness
 from harness_scorecard.models import Status
 from tests.test_checks import get_check, make_config
+from tests.test_claims import GIT_GUARD, build_harness
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
 
 class TestD5Registered(unittest.TestCase):
-    def test_all_three_checks_exist(self):
+    def test_all_d5_checks_exist(self):
         ids = {c.id for c in ALL_CHECKS}
-        self.assertTrue({"HS-D5-01", "HS-D5-02", "HS-D5-03"} <= ids)
+        self.assertTrue({"HS-D5-01", "HS-D5-02", "HS-D5-03", "HS-D5-04"} <= ids)
 
 
 class TestD5OnFixtures(unittest.TestCase):
@@ -109,6 +111,61 @@ class TestD503SnapshotValidate(unittest.TestCase):
 
     def test_neither_fails(self):
         self.assertEqual(get_check("HS-D5-03").run(make_config()).status, Status.FAIL)
+
+
+PUSH_GUARANTEE = "# Rules\n\n## Hard-Deny\n\n- Push to `main` or `master`\n"
+TWO_GUARANTEES = (
+    "# Rules\n\n## Hard-Deny\n\n"
+    "- Push to `main` or `master`\n"
+    "- Read or transmit `~/.ssh` credentials\n"
+)
+
+
+class TestD504StatedGuarantees(unittest.TestCase):
+    """A harness must never score worse for documenting rules — only for documenting
+    rules it doesn't enforce."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self._tmp.name)
+        self.addCleanup(self._tmp.cleanup)
+
+    def test_no_stated_guarantees_is_not_applicable(self):
+        config = build_harness(self.root, rules={"style.md": "# Style\n\n- Prefer tabs\n"})
+        result = get_check("HS-D5-04").run(config)
+        self.assertEqual(result.status, Status.NOT_APPLICABLE)
+
+    def test_single_prose_only_guarantee_fails(self):
+        config = build_harness(self.root, rules={"rules.md": PUSH_GUARANTEE})
+        result = get_check("HS-D5-04").run(config)
+        self.assertEqual(result.status, Status.FAIL)
+        self.assertTrue(any("prose-only" in line for line in result.evidence))
+
+    def test_fully_backed_guarantees_pass(self):
+        config = build_harness(
+            self.root,
+            rules={"rules.md": TWO_GUARANTEES},
+            hook_scripts={"git-safety.sh": GIT_GUARD},
+            deny=["Read(/Users/someone/.ssh/**)"],
+        )
+        self.assertEqual(get_check("HS-D5-04").run(config).status, Status.PASS)
+
+    def test_mixed_backing_is_partial(self):
+        config = build_harness(
+            self.root,
+            rules={"rules.md": TWO_GUARANTEES},
+            hook_scripts={"git-safety.sh": GIT_GUARD},
+        )
+        result = get_check("HS-D5-04").run(config)
+        self.assertEqual(result.status, Status.PARTIAL)
+
+    def test_bypass_mode_flips_hard_deny_backed_pass_to_fail(self):
+        rules = {"rules.md": PUSH_GUARANTEE}
+        hard = ["Push to main or master"]
+        backed = build_harness(self.root, rules=rules, hard_deny=hard, mode="default")
+        self.assertEqual(get_check("HS-D5-04").run(backed).status, Status.PASS)
+        bypassed = build_harness(self.root, rules=rules, hard_deny=hard, mode="bypassPermissions")
+        self.assertEqual(get_check("HS-D5-04").run(bypassed).status, Status.FAIL)
 
 
 if __name__ == "__main__":
