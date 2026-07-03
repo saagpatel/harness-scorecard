@@ -39,9 +39,17 @@ _WIDTH = 88
 _MISSING_NARRATIVE = "(no failure mode on file)"
 
 
+def _deduped_checks() -> list[Check[Any]]:
+    """Every registered check (both adapters), preserving the first owner of shared ids."""
+    by_id: dict[str, Check[Any]] = {}
+    for check in chain(ALL_CHECKS, CODEX_CHECKS):
+        by_id.setdefault(check.id, check)
+    return list(by_id.values())
+
+
 def _catalog() -> dict[str, Check[Any]]:
-    """Every registered check (both adapters) keyed by id. Ids never collide across suites."""
-    return {check.id: check for check in chain(ALL_CHECKS, CODEX_CHECKS)}
+    """Every registered check (both adapters) keyed by id."""
+    return {check.id: check for check in _deduped_checks()}
 
 
 def find_check(check_id: str) -> Check[Any] | None:
@@ -51,7 +59,7 @@ def find_check(check_id: str) -> Check[Any] | None:
 
 def all_check_ids() -> list[str]:
     """Every registered check id, in catalog order — used to suggest valid ids on a miss."""
-    return [check.id for check in chain(ALL_CHECKS, CODEX_CHECKS)]
+    return [check.id for check in _deduped_checks()]
 
 
 def to_explain_dict(check: Check[Any]) -> dict[str, Any]:

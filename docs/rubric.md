@@ -262,6 +262,10 @@ harness shows in config. *Failure mode* = the documented incident it guards agai
   and `mcp__.*`. FM: can't reconstruct what an agent/injection did.
 - **HS-D10-02 — Failure & denial logging (2, STATIC)**: `PermissionDenied` /
   `PostToolUseFailure` / `StopFailure` log hooks. FM: silent failures leave no trail.
+- **HS-D10-03 — Peer-agent branch receipt discipline (1, RUNTIME)**: read-only git +
+  bridge-db lookup verifies any `codex/*` or `cc/*` branch with commits ahead of `main` has a
+  matching `activity_log.branch` receipt for the repo. FM: writing task shipped with no durable
+  proof receipt. This is suggest-only; it is not a capability gate.
 
 ## 6. Codex adapter — same rubric, different guard surface
 
@@ -374,6 +378,8 @@ surface offers.
 - **CDX-D10-01 — Tool calls audit-logged (1, STATIC)**: a `PostToolUse` audit hook.
 - **CDX-D10-02 — Turn completion observable (1, STATIC)**: `notify` configured (PASS) or a
   `Stop` hook (PARTIAL).
+- **HS-D10-03 — Peer-agent branch receipt discipline (1, RUNTIME)**: shared with the Claude
+  suite because it grades repo proof receipts rather than Codex config syntax.
 
 > **Static-analysis limit (opaque dispatcher pattern):** a harness that routes every hook through
 > one opaque dispatcher (e.g. `pre_tool_use_dispatch.py`) hides its security logic from
