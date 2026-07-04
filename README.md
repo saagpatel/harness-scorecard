@@ -97,6 +97,23 @@ Every config is static and inert; nothing executes. Each [`ATTACK.md`](examples/
 narrates the threat, the gate that catches it, and the one-line fix. This is the moat: not
 "trust our checklist," but "here is the attack, and here is the proof we catch it."
 
+## Install
+
+```bash
+python -m pip install harness-scorecard
+
+# Or run the published package without adding it to the current environment.
+uvx harness-scorecard scan ~/.claude
+```
+
+For GitHub Actions, use the moving major tag for the latest stable 1.x action, or
+pin an exact release tag when you want a fully fixed revision:
+
+```yaml
+- uses: saagpatel/harness-scorecard@v1
+# - uses: saagpatel/harness-scorecard@v1.13.0
+```
+
 ## Usage
 
 ```bash
