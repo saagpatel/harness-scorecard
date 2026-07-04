@@ -15,7 +15,7 @@ This repo publishes two surfaces:
    Owner: saagpatel
    Repository name: harness-scorecard
    Workflow name: publish.yml
-   Environment name: blank / empty
+   Environment name: pypi
    ```
 
    Project settings page:
@@ -45,8 +45,10 @@ The failure output prints useful claims:
 - `environment`
 - `ref`
 
-For this repo, `publish.yml` should not set a GitHub Actions environment unless
-PyPI is also configured with that same environment name.
+For this repo, `publish.yml` intentionally sets the `pypi` GitHub Actions
+environment so manual and tag-triggered publishes pass through the same release
+gate before the job receives `id-token: write`. PyPI trusted publishing must be
+configured with that same `pypi` environment claim.
 
 ## Post-Release Readback
 
