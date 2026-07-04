@@ -33,6 +33,19 @@ harness-scorecard scan ~/.claude --sarif harness.sarif --min-grade C
 
 - This repo only has minimum-viable recovery context today; deeper handoff details may still live in the README and supporting docs.
 
+## Review guidelines
+
+Focus Codex review on read-only enforcement, claim/backing correctness, hook
+phase and matcher semantics, path-boundary matching, SARIF and JSON output
+contracts, release workflow permissions, trusted-publisher environment gates,
+and whether a score or grade can overstate harness safety. Treat any change
+that broadens filesystem or secret access, weakens blocking-hook checks, or
+lets publish/test jobs inherit unnecessary credentials as merge-relevant.
+
+For docs-only PRs, comment only when docs claim a grade, safety property,
+permission boundary, release state, or output format that is not supported by
+the reviewed code or workflows.
+
 ## Next Recommended Move
 
 Use this context plus the README and supporting docs to resume the next active task, then promote the repo beyond minimum-viable by capturing a dedicated handoff, roadmap, or discovery artifact.
