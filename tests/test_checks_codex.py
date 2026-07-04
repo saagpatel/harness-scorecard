@@ -123,8 +123,13 @@ class TestD4DestructiveGit(unittest.TestCase):
 
     def test_approval_granularity_tiers(self) -> None:
         self.assertEqual(
-            get_check("CDX-D4-03").run(make_codex_config(approval_policy="on-request")).status,
+            get_check("CDX-D4-03").run(make_codex_config(approval_policy="untrusted")).status,
             Status.PASS,
+        )
+        # Rubric 1.4.0 alignment: on-request is model-discretionary, never full gate credit.
+        self.assertEqual(
+            get_check("CDX-D4-03").run(make_codex_config(approval_policy="on-request")).status,
+            Status.PARTIAL,
         )
         self.assertEqual(
             get_check("CDX-D4-03").run(make_codex_config(approval_policy="on-failure")).status,

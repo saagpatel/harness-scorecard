@@ -6,6 +6,16 @@ All notable changes to Harness Scorecard are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- **CDX-D4-03 no longer gives `approval_policy = "on-request"` full gate credit** (rubric
+  1.4.0). On-request approval is model-discretionary: the model decides whether to ask,
+  so it is a risk reducer, not a deterministic pre-run gate. It now earns PARTIAL;
+  `untrusted` (which prompts for every model-proposed command) keeps PASS. This aligns
+  `scan` with the claims audit, which already declined to count discretionary approval
+  as enforcement backing; the CDX-D4-01 effective-floor evidence now labels a
+  discretionary approval layer as such.
+
 ## [1.12.0] - 2026-07-04
 
 ### Added
