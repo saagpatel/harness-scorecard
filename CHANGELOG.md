@@ -6,7 +6,36 @@ All notable changes to Harness Scorecard are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.12.0] - 2026-07-04
+
 ### Added
+
+- **Claims audit: grade a harness against its own stated guarantees.** A new
+  `harness-scorecard claims <path>` subcommand parses the rules prose (CLAUDE.md +
+  `rules/*.md`, or AGENTS.md for Codex), extracts every enforcement claim, statically
+  extracts hook-body deny sets, and reports per claim — under the **active** enforcement
+  mode — whether it is actually enforced and by what (`enforced_hook` / `enforced_deny` /
+  `enforced_both` / `candidate_logic` / `prose_only` / `style_rule`). `--json` emits the
+  machine ledger; exit is non-zero when a hard-deny-class claim is prose-only, and
+  `--strict` widens the gate to every enforcement claim. The engine is honest by
+  construction: a guard whose deny decision depends on live state can never be credited
+  as enforced (it caps at `candidate_logic`, structurally), matching never
+  substring-matches bare words, and coverage/unread-script counters are always emitted —
+  the audit can under-count, but it cannot claim a guarantee is enforced when it isn't.
+- **HS-D5-04 / CDX-D5-04 — Stated hard guarantees have enforcement backing.** The graded
+  counterpart of the ledger, in D5 for both adapters. N/A — never a penalty — when the
+  harness states no hard guarantees; a harness only scores worse for documenting rules it
+  doesn't enforce. Rubric bumped to 1.3.0 (1.2.0 Claude Code claims, 1.3.0 Codex adapter).
+### Fixed
+
+- **Codex config backing could over-credit claims (pre-release fix, never shipped).**
+  The synthesized `approval_policy` / env-scrub backing strings enumerated 10+ lexicon
+  verbs, so any hard-deny claim sharing three of them (e.g. "never drop, truncate, or
+  delete production tables") was falsely reported `enforced_deny` — and CDX-D5-04
+  falsely PASSed — under the *default* Codex config. Config backing now names only what
+  the sandbox deterministically blocks (network egress; writes outside writable roots),
+  synthesized backing strings never use the many-hits matching fallback, and
+  `approval_policy` / env scrubbing surface as report notes instead of claim backing.
 
 - **HS-D10-03 peer-agent branch receipt discipline.** The scorer now uses read-only git and
   bridge-db access to flag `codex/*` or `cc/*` branches that have commits ahead of `main` but no
