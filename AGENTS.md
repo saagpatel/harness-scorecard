@@ -42,6 +42,12 @@ and whether a score or grade can overstate harness safety. Treat any change
 that broadens filesystem or secret access, weakens blocking-hook checks, or
 lets publish/test jobs inherit unnecessary credentials as merge-relevant.
 
+Treat exact output and release claims as contracts. Console text, JSON, SARIF,
+HTML, exit codes, score/grade semantics, action examples, and PyPI/GitHub
+release instructions must stay aligned with code and workflows. A docs or
+workflow change that alters the trusted-publisher claim, `id-token` boundary,
+tag trigger, or consumer-facing output shape is merge-relevant.
+
 For docs-only PRs, comment only when docs claim a grade, safety property,
 permission boundary, release state, or output format that is not supported by
 the reviewed code or workflows.
