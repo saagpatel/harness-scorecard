@@ -127,6 +127,7 @@ def build_codex_harness(
     *,
     agents_md: str = CODEX_AGENTS_MD,
     hook_scripts: dict[str, str] | None = None,
+    hook_command_prefix: str = "hooks",
     approval_policy: str = "on-request",
     sandbox_mode: str = "workspace-write",
 ) -> object:
@@ -147,7 +148,9 @@ def build_codex_harness(
         hook_entries = []
         for name, text in hook_scripts.items():
             (root / "hooks" / name).write_text(text, encoding="utf-8")
-            hook_entries.append({"type": "command", "command": f"bash hooks/{name}"})
+            hook_entries.append(
+                {"type": "command", "command": f"bash {hook_command_prefix}/{name}"}
+            )
         hooks = {"PreToolUse": [{"matcher": "Bash", "hooks": hook_entries}]}
     (root / "hooks.json").write_text(json.dumps({"hooks": hooks}), encoding="utf-8")
     return load_codex_harness(root)
@@ -365,6 +368,17 @@ class TestCodexClaimsAudit(unittest.TestCase):
             )
         self.assertIs(self.by_text(bypassed, "Push to").status, ClaimStatus.PROSE_ONLY)
         self.assertTrue(any("effective bypass" in note for note in bypassed.notes))
+
+    def test_codex_home_alias_resolves_when_directory_is_not_named_codex(self):
+        config = build_codex_harness(
+            self.root,
+            agents_md="# AGENTS\n\n## Hard-Deny\n\n- Read `~/vaultbox`\n",
+            hook_scripts={"path-guard.sh": CODEX_PATH_GUARD},
+            hook_command_prefix="$CODEX_HOME/hooks",
+        )
+        report = audit_claims(config)
+        self.assertEqual(report.scripts_read, ["path-guard.sh"])
+        self.assertIs(self.by_text(report, "~/vaultbox").status, ClaimStatus.ENFORCED_HOOK)
 
 
 if __name__ == "__main__":

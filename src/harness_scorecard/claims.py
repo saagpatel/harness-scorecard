@@ -308,11 +308,15 @@ _QUALIFIER_NOTE = (
 )
 
 
-def _root_alias_prefixes(root: Path) -> tuple[str, ...]:
-    return _CODEX_ROOT_ALIAS_PREFIXES if root.name == ".codex" else _CLAUDE_ROOT_ALIAS_PREFIXES
+def _root_alias_prefixes(config: ClaimsConfig) -> tuple[str, ...]:
+    if isinstance(config, CodexConfig):
+        return _CODEX_ROOT_ALIAS_PREFIXES
+    return _CLAUDE_ROOT_ALIAS_PREFIXES
 
 
-def _resolve_hook_script(command: str, root: Path) -> Path | None:
+def _resolve_hook_script(
+    command: str, root: Path, alias_prefixes: tuple[str, ...]
+) -> Path | None:
     """Find the shell script a hook command runs, or ``None`` (reported as unread)."""
     try:
         tokens = shlex.split(command)
@@ -322,7 +326,7 @@ def _resolve_hook_script(command: str, root: Path) -> Path | None:
         cleaned = token.strip("\"'")
         if not cleaned.endswith(_SCRIPT_SUFFIXES):
             continue
-        for prefix in _root_alias_prefixes(root):
+        for prefix in alias_prefixes:
             if cleaned.startswith(prefix):
                 candidate = root / cleaned[len(prefix) :]
                 if candidate.is_file():
@@ -358,13 +362,14 @@ class _DenyUniverse:
 def _build_deny_universe(config: ClaimsConfig) -> _DenyUniverse:
     """Extract the deny sets of every readable shell guard the harness registers."""
     universe = _DenyUniverse()
+    alias_prefixes = _root_alias_prefixes(config)
     seen_commands: set[str] = set()
     seen_scripts: set[Path] = set()
     for hook in config.hooks:
         if hook.command in seen_commands:
             continue
         seen_commands.add(hook.command)
-        script = _resolve_hook_script(hook.command, config.root)
+        script = _resolve_hook_script(hook.command, config.root, alias_prefixes)
         if script is None:
             universe.scripts_unread.append(_short_command(hook.command))
             continue
