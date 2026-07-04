@@ -6,6 +6,15 @@ All notable changes to Harness Scorecard are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.13.1] - 2026-07-04
+
+### Changed
+
+- **GitHub Action runtime pins now target Node 24 based upstream actions.** The
+  repo CI, PyPI publish workflow, and composite action metadata move from the
+  deprecated Node 20 action majors to the current Node 24 majors while keeping
+  SHA pinning.
+
 ## [1.13.0] - 2026-07-04
 
 ### Changed
