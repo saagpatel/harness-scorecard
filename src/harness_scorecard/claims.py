@@ -30,13 +30,12 @@ import shlex
 from dataclasses import asdict, dataclass, field
 from enum import StrEnum
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
 
+from harness_scorecard.discovery import HarnessConfig
+from harness_scorecard.discovery_codex import CodexConfig
 from harness_scorecard.guard_extract import extract_deny_blocks
 
-if TYPE_CHECKING:
-    from harness_scorecard.discovery import HarnessConfig
-    from harness_scorecard.discovery_codex import CodexConfig
+type ClaimsConfig = HarnessConfig | CodexConfig
 
 
 class ClaimClass(StrEnum):
@@ -356,7 +355,7 @@ class _DenyUniverse:
     scripts_unread: list[str] = field(default_factory=list)
 
 
-def _build_deny_universe(config: HarnessConfig | CodexConfig) -> _DenyUniverse:
+def _build_deny_universe(config: ClaimsConfig) -> _DenyUniverse:
     """Extract the deny sets of every readable shell guard the harness registers."""
     universe = _DenyUniverse()
     seen_commands: set[str] = set()
@@ -390,10 +389,6 @@ def _build_deny_universe(config: HarnessConfig | CodexConfig) -> _DenyUniverse:
     return universe
 
 
-def _is_codex_config(config: Any) -> bool:
-    return getattr(config, "harness_type", "") == "codex"
-
-
 def _codex_home_writable(config: CodexConfig) -> bool:
     codex_home = config.root.expanduser()
     for raw in config.writable_roots:
@@ -408,10 +403,10 @@ def _codex_home_writable(config: CodexConfig) -> bool:
     return False
 
 
-def _claim_sources(config: HarnessConfig | CodexConfig) -> list[tuple[str, str]]:
+def _claim_sources(config: ClaimsConfig) -> list[tuple[str, str]]:
     root = config.root
     sources: list[tuple[str, str]] = []
-    if _is_codex_config(config):
+    if isinstance(config, CodexConfig):
         if config.has_agents_md:
             sources.append(("AGENTS.md", _read(root / "AGENTS.md") or ""))
         sources.extend(
@@ -453,8 +448,8 @@ def _codex_config_backing(config: CodexConfig) -> list[str]:
     return backing
 
 
-def _declarative_backing(config: HarnessConfig | CodexConfig) -> list[tuple[str, str]]:
-    if _is_codex_config(config):
+def _declarative_backing(config: ClaimsConfig) -> list[tuple[str, str]]:
+    if isinstance(config, CodexConfig):
         return [("config", rule) for rule in _codex_config_backing(config)]
     hard_deny_rules = config.hard_deny if config.hard_deny_effective else []
     return [("deny", glob) for glob in config.deny] + [
@@ -462,27 +457,27 @@ def _declarative_backing(config: HarnessConfig | CodexConfig) -> list[tuple[str,
     ]
 
 
-def _audit_mode(config: HarnessConfig | CodexConfig) -> str:
-    if _is_codex_config(config):
+def _audit_mode(config: ClaimsConfig) -> str:
+    if isinstance(config, CodexConfig):
         return f"sandbox={config.sandbox_mode}, approval={config.approval_policy}"
     return config.default_mode
 
 
-def _hard_deny_effective(config: HarnessConfig | CodexConfig) -> bool:
-    if _is_codex_config(config):
+def _hard_deny_effective(config: ClaimsConfig) -> bool:
+    if isinstance(config, CodexConfig):
         return not config.is_bypass
     return config.hard_deny_effective
 
 
-def _audit_notes(config: HarnessConfig | CodexConfig, universe: _DenyUniverse) -> list[str]:
+def _audit_notes(config: ClaimsConfig, universe: _DenyUniverse) -> list[str]:
     notes = [_QUALIFIER_NOTE]
-    if _is_codex_config(config) and config.is_bypass:
+    if isinstance(config, CodexConfig) and config.is_bypass:
         notes.append(
             "Codex is in effective bypass (sandbox_mode=danger-full-access and "
             "approval_policy=never); sandbox and approval-policy config were not counted as "
             "claim backing."
         )
-    if not _is_codex_config(config) and config.is_bypass and config.hard_deny:
+    if isinstance(config, HarnessConfig) and config.is_bypass and config.hard_deny:
         notes.append(
             f"autoMode.hard_deny ({len(config.hard_deny)} rules) is INERT under "
             "bypassPermissions and was not counted as backing."
@@ -496,7 +491,7 @@ def _audit_notes(config: HarnessConfig | CodexConfig, universe: _DenyUniverse) -
     return notes
 
 
-def audit_claims(config: HarnessConfig | CodexConfig) -> ClaimsReport:
+def audit_claims(config: ClaimsConfig) -> ClaimsReport:
     """Run the full claims audit against a loaded harness (read-only)."""
     root = config.root
     claims = extract_claims(_claim_sources(config))

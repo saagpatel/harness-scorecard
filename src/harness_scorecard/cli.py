@@ -16,6 +16,8 @@ from typing import TYPE_CHECKING
 from harness_scorecard.badge import render_badge
 from harness_scorecard.claims import audit_claims, render_claims_console, render_claims_json
 from harness_scorecard.diff import diff_scorecards, render_diff_console, render_diff_json
+from harness_scorecard.discovery import HarnessConfig
+from harness_scorecard.discovery_codex import CodexConfig
 from harness_scorecard.dispatch import HARNESS_TYPES, select_adapter
 from harness_scorecard.explain import (
     all_check_ids,
@@ -285,6 +287,9 @@ def _run_claims(args: argparse.Namespace) -> int:
         config, _checks = select_adapter(root, args.harness_type)
     except (OSError, ValueError) as exc:
         print(f"error: {redact_text(str(exc))}", file=sys.stderr)
+        return 2
+    if not isinstance(config, HarnessConfig | CodexConfig):
+        print(f"error: claims audit is not supported for {config.harness_type}", file=sys.stderr)
         return 2
 
     report = audit_claims(config)
