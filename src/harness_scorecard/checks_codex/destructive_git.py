@@ -22,7 +22,11 @@ from harness_scorecard.models import Detectability, Grade, Severity
 # Compound needles only: bare "git"/"push"/"force"/"safety" over-credit unrelated hooks
 # (push-notification, aws-safety-logger, "legitimate" containing "git", etc.).
 _GIT_HOOK_NEEDLES = ("git-safety", "git-guard", "force-push", "destructive")
-_GATED_APPROVALS = ("untrusted", "on-request")
+# Only `untrusted` prompts deterministically for every model-proposed command.
+# `on-request` leaves the ask to the model's own discretion, so it is a risk reducer,
+# not a pre-run gate — crediting it as one disagreed with the claims audit (rubric 1.4.0).
+_DETERMINISTIC_APPROVALS = ("untrusted",)
+_DISCRETIONARY_APPROVALS = ("on-request",)
 
 # trust_level=trusted suppresses approval prompts inside a directory. A handful of trusted
 # project roots is a normal, bounded choice; a large set erodes the approval gate broadly.
@@ -39,7 +43,12 @@ def _has_bash_git_guard(config: CodexConfig) -> bool:
 def _destructive_floor(config: CodexConfig) -> CheckOutcome:
     sources: list[str] = []
     if not config.approval_disabled:
-        sources.append(f"approval_policy={config.approval_policy}")
+        # Still a defense-in-depth layer, but a discretionary one is labeled so the
+        # evidence never overstates it as a deterministic gate.
+        qualifier = (
+            "" if config.approval_policy in _DETERMINISTIC_APPROVALS else " (model-discretionary)"
+        )
+        sources.append(f"approval_policy={config.approval_policy}{qualifier}")
     if not config.sandbox_disabled:
         sources.append(f"sandbox_mode={config.sandbox_mode}")
     if _has_bash_git_guard(config):
@@ -63,8 +72,13 @@ def _git_safety_hook(config: CodexConfig) -> CheckOutcome:
 
 def _approval_granularity(config: CodexConfig) -> CheckOutcome:
     policy = config.approval_policy
-    if policy in _GATED_APPROVALS:
-        return passed(f"approval_policy={policy} prompts before model-proposed commands run.")
+    if policy in _DETERMINISTIC_APPROVALS:
+        return passed(f"approval_policy={policy} prompts before every model-proposed command.")
+    if policy in _DISCRETIONARY_APPROVALS:
+        return partial(
+            "approval_policy=on-request leaves the approval ask to the model's discretion; "
+            "a risk reducer, not a deterministic pre-run gate.",
+        )
     if policy == "on-failure":
         return partial(
             "approval_policy=on-failure only prompts after a command fails; the first run is "
@@ -146,8 +160,8 @@ CHECKS: list[Check[CodexConfig]] = [
         severity=Severity.HIGH,
         detectability=Detectability.STATIC,
         remediation=(
-            "Set approval_policy to 'on-request' or 'untrusted' so commands are gated before "
-            "they run."
+            "Set approval_policy to 'untrusted' for a deterministic pre-run gate; 'on-request' "
+            "leaves the ask to the model's discretion and earns partial credit only."
         ),
     ),
     Check(

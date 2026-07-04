@@ -347,7 +347,11 @@ approval inside that directory.
 - **CDX-D4-02 — Git-safety Bash hook (2, STATIC)**: a PreToolUse Bash hook guards
   git/destructive commands. FM: force-push / destructive shell.
 - **CDX-D4-03 — Approval gates before execution (2, STATIC)**: `approval_policy` is
-  `on-request`/`untrusted` (PASS), `on-failure` (PARTIAL), `never` (FAIL).
+  `untrusted` (PASS — prompts deterministically for every model-proposed command),
+  `on-request` (PARTIAL — the model decides whether to request approval; a risk reducer,
+  not a deterministic pre-run gate) or `on-failure` (PARTIAL — first run ungated),
+  `never` (FAIL). Aligned with the claims audit in rubric 1.4.0: neither surface counts
+  model-discretionary approval as enforcement.
 - **CDX-D4-04 — Trusted-project breadth is bounded (2, STATIC)**: counts
   `[projects."…"].trust_level = "trusted"` entries — each suppresses approval prompts in its
   directory. 0 or a bounded set (≤25) PASS, >25 PARTIAL, >100 FAIL; N/A when `approval_policy`
