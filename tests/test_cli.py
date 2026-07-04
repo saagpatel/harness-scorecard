@@ -3,11 +3,13 @@
 import contextlib
 import io
 import json
+import tempfile
 import unittest
 from pathlib import Path
 
 from harness_scorecard.cli import main
 from harness_scorecard.models import RUBRIC_VERSION
+from tests.test_claims import GIT_GUARD
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -120,6 +122,65 @@ class TestMinGradeGate(unittest.TestCase):
         with self.assertRaises(SystemExit) as ctx:
             run_cli(["scan", str(FIXTURES / "strong_harness"), "--min-grade", "Z"])
         self.assertEqual(ctx.exception.code, 2)
+
+
+HARD_GUARANTEE_RULE = "# Rules\n\n## Hard-Deny\n\n- Push to `main` or `master`\n"
+SOFT_ENFORCEMENT_RULE = "\n## Git\n\n- Never `git commit --amend` after a hook failure\n"
+
+
+def write_claims_harness(root: Path, *, include_guard: bool = True, extra_rule: str = "") -> None:
+    """A synthetic claims-audit harness: one hard guarantee, optionally its guard."""
+    (root / "rules").mkdir()
+    (root / "rules" / "git.md").write_text(HARD_GUARANTEE_RULE + extra_rule, encoding="utf-8")
+    hooks: dict = {}
+    if include_guard:
+        (root / "hooks").mkdir()
+        (root / "hooks" / "git-safety.sh").write_text(GIT_GUARD, encoding="utf-8")
+        hooks = {
+            "PreToolUse": [{"matcher": "Bash", "hooks": [{"command": "bash hooks/git-safety.sh"}]}]
+        }
+    settings = {"permissions": {"defaultMode": "default", "deny": []}, "hooks": hooks}
+    (root / "settings.json").write_text(json.dumps(settings), encoding="utf-8")
+
+
+class TestClaimsCommand(unittest.TestCase):
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self._tmp.name)
+        self.addCleanup(self._tmp.cleanup)
+
+    def test_backed_guarantee_exits_zero(self):
+        write_claims_harness(self.root)
+        code, out = run_cli(["claims", str(self.root)])
+        self.assertEqual(code, 0)
+        self.assertIn("ENFORCED (hook)", out)
+
+    def test_prose_only_hard_guarantee_gates_exit_one(self):
+        write_claims_harness(self.root, include_guard=False)
+        code, out = run_cli(["claims", str(self.root)])
+        self.assertEqual(code, 1)
+        self.assertIn("PROSE-ONLY", out)
+        self.assertIn("[HARD-DENY]", out)
+
+    def test_strict_widens_gate_to_all_enforcement_claims(self):
+        write_claims_harness(self.root, extra_rule=SOFT_ENFORCEMENT_RULE)
+        code, _ = run_cli(["claims", str(self.root)])
+        self.assertEqual(code, 0)  # the hard guarantee is backed; soft claim doesn't gate
+        code, out = run_cli(["claims", str(self.root), "--strict"])
+        self.assertEqual(code, 1)
+        self.assertIn("PROSE-ONLY", out)
+
+    def test_json_format_emits_ledger_and_coverage(self):
+        write_claims_harness(self.root)
+        code, out = run_cli(["claims", str(self.root), "--format", "json"])
+        self.assertEqual(code, 0)
+        payload = json.loads(out)
+        self.assertEqual(payload["coverage"]["deny_blocks_found"], 1)
+        self.assertIn("enforced_hook", {f["status"] for f in payload["findings"]})
+
+    def test_missing_harness_exits_two(self):
+        code, _ = run_cli(["claims", str(self.root / "nope")])
+        self.assertEqual(code, 2)
 
 
 if __name__ == "__main__":

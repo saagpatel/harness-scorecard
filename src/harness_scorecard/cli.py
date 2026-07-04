@@ -14,7 +14,9 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from harness_scorecard.badge import render_badge
+from harness_scorecard.claims import audit_claims, render_claims_console, render_claims_json
 from harness_scorecard.diff import diff_scorecards, render_diff_console, render_diff_json
+from harness_scorecard.discovery import load_harness
 from harness_scorecard.dispatch import HARNESS_TYPES, select_adapter
 from harness_scorecard.explain import (
     all_check_ids,
@@ -183,6 +185,31 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Exit non-zero if any graded harness is below this band (default: B).",
     )
 
+    claims = sub.add_parser(
+        "claims",
+        help="Audit the rules prose: which stated guarantees are actually enforced "
+        "under the active permission mode.",
+    )
+    claims.add_argument("path", help="Path to a Claude Code harness directory (e.g. ~/.claude).")
+    claims.add_argument(
+        "--format",
+        choices=["console", "json"],
+        default="console",
+        help="Output format for stdout (default: console).",
+    )
+    claims.add_argument(
+        "--json",
+        dest="json_out",
+        metavar="FILE",
+        help="Also write the JSON ledger to FILE.",
+    )
+    claims.add_argument(
+        "--strict",
+        action="store_true",
+        help="Exit non-zero when ANY enforcement claim is prose-only "
+        "(default: only hard-deny-class claims gate).",
+    )
+
     explain = sub.add_parser(
         "explain",
         help="Explain one check: its failure mode, the fix, and (for gates) the red-team proof.",
@@ -244,6 +271,26 @@ def _run_scan(args: argparse.Namespace) -> int:
             handle.write(prefix + render_github_summary(card))
 
     return 0 if grade_rank(card.grade) >= grade_rank(Grade(args.min_grade)) else 1
+
+
+def _run_claims(args: argparse.Namespace) -> int:
+    root = Path(args.path).expanduser()
+    try:
+        config = load_harness(root)
+    except (OSError, ValueError) as exc:
+        print(f"error: {redact_text(str(exc))}", file=sys.stderr)
+        return 2
+
+    report = audit_claims(config)
+    output = render_claims_json(report) if args.format == "json" else render_claims_console(report)
+    print(output)
+    if args.json_out:
+        Path(args.json_out).expanduser().write_text(render_claims_json(report), encoding="utf-8")
+
+    # Gate philosophy mirrors `scan`: a stated hard guarantee with no surviving
+    # enforcement is a failure, not a nit. --strict widens to every enforcement claim.
+    gated = report.enforcement_prose_only() if args.strict else report.hard_prose_only()
+    return 1 if gated else 0
 
 
 def _resolve_scorecard(raw_path: str, harness_type: str) -> Scorecard:
@@ -321,6 +368,8 @@ def main(argv: list[str] | None = None) -> int:
         return _run_diff(args)
     if args.command == "fleet":
         return _run_fleet(args)
+    if args.command == "claims":
+        return _run_claims(args)
     if args.command == "explain":
         return _run_explain(args)
     parser.print_help()

@@ -102,6 +102,13 @@ FAILURE_MODES: dict[str, str] = {
         "settings.json silently truncates to a bypass-accept stub with no backup, because edits "
         "are not snapshotted before and validated after."
     ),
+    "HS-D5-04": (
+        "The rules prose promises a hard block ('never read ~/.ssh', 'destructive DB ops are "
+        "denied') that no hook or deny glob actually enforces under the active permission mode "
+        "— a live-proven gap: an operator dry-run found a stated hard-deny rule whose guarded "
+        "read went through unblocked. Prose is instruction, not enforcement; an injected or "
+        "careless agent is bound only by the effective floor."
+    ),
     # D6 — Verification gates
     "HS-D6-01": (
         "The agent claims 'done' with no evidence, because no TaskCompleted hook runs "

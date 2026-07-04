@@ -180,6 +180,33 @@ Pass any paths or globs (`fleet ~/.claude ~/Projects/*/.claude`); each harness i
 its own auto-discovered policy. `--min-grade` (default `B`) exits non-zero if **any** harness is
 below the bar — drop it in CI to keep a whole team's harnesses above a floor.
 
+### Audit your own stated guarantees
+
+The rubric grades against *our* expectations. `claims` grades against *yours*: it parses
+the rules prose (CLAUDE.md + `rules/*.md`), extracts every enforcement claim, and answers
+per claim — under the active permission mode — *is this actually enforced, and by what?*
+
+```text
+$ harness-scorecard claims ~/.claude
+
+ENFORCED (deny)    rules/sandboxing.md:21 [HARD-DENY]  Read or transmit ~/.ssh, ~/.aws, ...
+                     backing: deny:Read(//Users/you/.ssh/**), ... (+4 more)
+ENFORCED (hook)    rules/sandboxing.md:22 [HARD-DENY]  Push to main or master
+                     backing: hook:git-safety.sh
+PROSE-ONLY         rules/sandboxing.md:23 [HARD-DENY]  Destructive DB ops on non-localhost hosts
+CANDIDATE (logic)  rules/git.md:14                     Never amend after a hook failure
+                     backing: git-state-guard.sh
+STYLE              rules/testing.md:38                 Do NOT use waitForTimeout ...
+```
+
+Deny sets are extracted statically from hook bodies; a guard whose deny decision depends
+on live state is surfaced as a manual-review candidate, never credited — the audit can
+under-count, but it cannot claim a guarantee is enforced when it isn't. Exit is non-zero
+when a hard-deny-class claim is prose-only (`--strict` widens that to every enforcement
+claim); `--format json` / `--json FILE` emit the machine ledger. The graded counterpart
+is check `HS-D5-04`, which is N/A — never a penalty — for harnesses that state no hard
+guarantees.
+
 ### Grade badge
 
 Emit a flat SVG badge (colored A green → F red) for a harness repo's README, then regenerate it
