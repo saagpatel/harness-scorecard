@@ -268,8 +268,14 @@ def norm_words(text: str) -> set[str]:
     return words
 
 
-def match_tokens(tokens: list[str], haystack: str) -> list[str]:
-    """Exact-word hits; a match needs a path, an exact flag, or verb+noun co-occurrence."""
+def match_tokens(tokens: list[str], haystack: str, *, allow_many_hits: bool = True) -> list[str]:
+    """Exact-word hits; a match needs a path, an exact flag, or verb+noun co-occurrence.
+
+    ``allow_many_hits=False`` disables the many-exact-hits fallback. That fallback is
+    calibrated for organically-written haystacks (deny globs, hook bodies); against a
+    synthesized keyword-dense haystack it over-credits, so synthesized backing strings
+    must match only on the specific rules (path / flag / verb+noun).
+    """
     hay_words = norm_words(haystack)
     hay_text = re.sub(r"\s+", " ", haystack.lower())
     hay_canon = _canon_paths(haystack)
@@ -289,7 +295,8 @@ def match_tokens(tokens: list[str], haystack: str) -> list[str]:
     flags = [t for t in hits if t.startswith("-")]
     verbs = [t for t in hits if t in VERB_LEXICON]
     others = [t for t in hits if t not in VERB_LEXICON and t not in flags]
-    if paths or flags or (verbs and others) or len(hits) >= _MANY_HITS_THRESHOLD:
+    many = allow_many_hits and len(hits) >= _MANY_HITS_THRESHOLD
+    if paths or flags or (verbs and others) or many:
         return hits
     return []
 
@@ -314,9 +321,7 @@ def _root_alias_prefixes(config: ClaimsConfig) -> tuple[str, ...]:
     return _CLAUDE_ROOT_ALIAS_PREFIXES
 
 
-def _resolve_hook_script(
-    command: str, root: Path, alias_prefixes: tuple[str, ...]
-) -> Path | None:
+def _resolve_hook_script(command: str, root: Path, alias_prefixes: tuple[str, ...]) -> Path | None:
     """Find the shell script a hook command runs, or ``None`` (reported as unread)."""
     try:
         tokens = shlex.split(command)
@@ -415,8 +420,7 @@ def _claim_sources(config: ClaimsConfig) -> list[tuple[str, str]]:
         if config.has_agents_md:
             sources.append(("AGENTS.md", _read(root / "AGENTS.md") or ""))
         sources.extend(
-            (f"agents/{name}", _read(root / "agents" / name) or "")
-            for name in config.agent_files
+            (f"agents/{name}", _read(root / "agents" / name) or "") for name in config.agent_files
         )
         return sources
 
@@ -429,12 +433,16 @@ def _claim_sources(config: ClaimsConfig) -> list[tuple[str, str]]:
 
 
 def _codex_config_backing(config: CodexConfig) -> list[str]:
+    """Backing strings for what the Codex sandbox *deterministically* blocks.
+
+    Only mechanisms with a hard, specific enforcement surface may back a claim, and each
+    string names only that surface (blocked actions / protected paths). Keyword-dense
+    strings are forbidden here: an enumeration of unrelated verbs turns accidental
+    lexical overlap into a false ``enforced_deny`` (2026-07 release-gate finding).
+    ``approval_policy`` and env scrubbing are context, not per-claim enforcement — they
+    surface as notes (see ``_audit_notes``), never as backing.
+    """
     backing: list[str] = []
-    if config.approval_policy in _CODEX_GATED_APPROVALS:
-        backing.append(
-            f"approval_policy:{config.approval_policy} gates command execution before run: "
-            "push commit merge force main master rm delete drop truncate install deploy publish"
-        )
     if config.network_blocked:
         backing.append(
             f"sandbox:{config.sandbox_mode} denies outbound network access: "
@@ -442,13 +450,8 @@ def _codex_config_backing(config: CodexConfig) -> list[str]:
         )
     if not config.sandbox_disabled and not _codex_home_writable(config):
         backing.append(
-            f"sandbox:{config.sandbox_mode} keeps ~/.codex out of write scope: "
-            "write edit mutate overwrite delete rm ~/.codex AGENTS.md config.toml hooks.json"
-        )
-    if config.env_secrets_scrubbed:
-        backing.append(
-            "shell_environment_policy keeps secret-looking env vars out of commands: "
-            "token secret credential password key"
+            f"sandbox:{config.sandbox_mode} denies writes outside writable roots; "
+            "protected: ~/.codex AGENTS.md config.toml hooks.json"
         )
     return backing
 
@@ -482,6 +485,19 @@ def _audit_notes(config: ClaimsConfig, universe: _DenyUniverse) -> list[str]:
             "approval_policy=never); sandbox and approval-policy config were not counted as "
             "claim backing."
         )
+    if isinstance(config, CodexConfig) and not config.is_bypass:
+        # These reduce risk generally but enforce no specific prohibition, so they are
+        # context, never claim backing (counting them produced false enforced verdicts).
+        if config.approval_policy in _CODEX_GATED_APPROVALS:
+            notes.append(
+                f"approval_policy={config.approval_policy} gates command execution generally; "
+                "it is context, not counted as backing for any specific claim."
+            )
+        if config.env_secrets_scrubbed:
+            notes.append(
+                "shell_environment_policy scrubs secret-like env vars; exposure reduction, "
+                "not counted as backing for any specific claim."
+            )
     if isinstance(config, HarnessConfig) and config.is_bypass and config.hard_deny:
         notes.append(
             f"autoMode.hard_deny ({len(config.hard_deny)} rules) is INERT under "
@@ -503,8 +519,7 @@ def audit_claims(config: ClaimsConfig) -> ClaimsReport:
     universe = _build_deny_universe(config)
     declarative = _declarative_backing(config)
     findings = [
-        _match_claim(c, universe.pattern_index, declarative, universe.logic_sources)
-        for c in claims
+        _match_claim(c, universe.pattern_index, declarative, universe.logic_sources) for c in claims
     ]
     return ClaimsReport(
         harness_path=str(root),
@@ -540,8 +555,12 @@ def _match_claim(
         return ClaimFinding(claim, ClaimStatus.STYLE_RULE)
 
     hook_hits = sorted({guard for guard, blob in pattern_index if match_tokens(claim.tokens, blob)})
+    # Synthesized config-backing strings never get the many-hits fallback: they must
+    # match on a path, flag, or verb+noun, or not at all (zero-false-enforced).
     declarative = [
-        f"{kind}:{rule}" for kind, rule in declarative_rules if match_tokens(claim.tokens, rule)
+        f"{kind}:{rule}"
+        for kind, rule in declarative_rules
+        if match_tokens(claim.tokens, rule, allow_many_hits=(kind != "config"))
     ]
 
     if hook_hits and declarative:

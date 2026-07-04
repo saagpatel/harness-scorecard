@@ -207,12 +207,28 @@ class TestD5SelfProtection(unittest.TestCase):
         self.assertEqual(get_check("CDX-D5-04").run(config).status, Status.NOT_APPLICABLE)
 
     def test_claims_check_passes_when_config_backs_hard_guarantee(self) -> None:
+        # The write-scope sandbox genuinely protects ~/.codex — the one hard guarantee
+        # the default config can honestly back.
         with tempfile.TemporaryDirectory() as tmp:
             config = build_codex_harness(
                 Path(tmp),
-                agents_md="# AGENTS\n\n## Hard-Deny\n\n- Push to `main` or `master`\n",
+                agents_md="# AGENTS\n\n## Hard-Deny\n\n- Mutate `~/.codex` or its `config.toml`\n",
             )
             self.assertEqual(get_check("CDX-D5-04").run(config).status, Status.PASS)
+
+    def test_claims_check_fails_multiverb_claim_under_default_config(self) -> None:
+        # Release-gate regression (2026-07): this exact harness graded PASS because a
+        # keyword-bag backing string absorbed the claim's destructive verbs. Nothing in
+        # the default config enforces it; the check must FAIL.
+        with tempfile.TemporaryDirectory() as tmp:
+            config = build_codex_harness(
+                Path(tmp),
+                agents_md=(
+                    "# AGENTS\n\n## Hard-Deny\n\n"
+                    "- Never drop, truncate, or delete production database tables\n"
+                ),
+            )
+            self.assertEqual(get_check("CDX-D5-04").run(config).status, Status.FAIL)
 
     def test_claims_check_fails_when_bypass_leaves_prose_only(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

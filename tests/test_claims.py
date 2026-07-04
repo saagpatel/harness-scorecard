@@ -353,9 +353,11 @@ class TestCodexClaimsAudit(unittest.TestCase):
         self.assertEqual(finding.backing, [])
 
     def test_codex_mode_flip_changes_config_backing(self):
-        agents_md = "# AGENTS\n\n## Hard-Deny\n\n- Push to `main` or `master`\n"
+        # The write-scope sandbox genuinely protects ~/.codex, so a claim about it is
+        # config-backed — until bypass dissolves the sandbox.
+        agents_md = "# AGENTS\n\n## Hard-Deny\n\n- Mutate `~/.codex` or its `config.toml`\n"
         effective = audit_claims(build_codex_harness(self.root, agents_md=agents_md))
-        self.assertIs(self.by_text(effective, "Push to").status, ClaimStatus.ENFORCED_DENY)
+        self.assertIs(self.by_text(effective, "~/.codex").status, ClaimStatus.ENFORCED_DENY)
 
         with tempfile.TemporaryDirectory() as other:
             bypassed = audit_claims(
@@ -366,8 +368,59 @@ class TestCodexClaimsAudit(unittest.TestCase):
                     sandbox_mode="danger-full-access",
                 )
             )
-        self.assertIs(self.by_text(bypassed, "Push to").status, ClaimStatus.PROSE_ONLY)
+        self.assertIs(self.by_text(bypassed, "~/.codex").status, ClaimStatus.PROSE_ONLY)
         self.assertTrue(any("effective bypass" in note for note in bypassed.notes))
+
+    def test_multiverb_claim_is_never_credited_to_config(self):
+        # Release-gate regression (2026-07): under the DEFAULT Codex config
+        # (approval_policy=on-request, workspace-write), a hard-deny claim dense in
+        # destructive verbs was falsely enforced_deny via a keyword-bag backing string.
+        # Nothing in config.toml inspects database operations; this must stay prose-only.
+        report = audit_claims(
+            build_codex_harness(
+                self.root,
+                agents_md=(
+                    "# AGENTS\n\n## Hard-Deny\n\n"
+                    "- Never drop, truncate, or delete production database tables\n"
+                ),
+            )
+        )
+        finding = self.by_text(report, "database tables")
+        self.assertIs(finding.status, ClaimStatus.PROSE_ONLY)
+        self.assertEqual(finding.backing, [])
+
+    def test_write_verbs_claim_about_other_paths_is_not_credited_to_write_scope(self):
+        # Companion regression: the write-scope backing protects ~/.codex, not arbitrary
+        # write targets — a vault claim sharing write verbs must not be credited.
+        report = audit_claims(
+            build_codex_harness(
+                self.root,
+                agents_md=(
+                    "# AGENTS\n\n## Hard-Deny\n\n"
+                    "- Never delete, overwrite, or mutate the user's personal notes vault\n"
+                ),
+            )
+        )
+        self.assertIs(self.by_text(report, "notes vault").status, ClaimStatus.PROSE_ONLY)
+
+    def test_network_claim_is_genuinely_backed_by_disabled_network(self):
+        # The network sandbox deterministically blocks all egress, so transmit-class
+        # claims are real config backing — the honest positive beside the negatives.
+        report = audit_claims(
+            build_codex_harness(
+                self.root,
+                agents_md=(
+                    "# AGENTS\n\n## Hard-Deny\n\n- Never transmit or `curl` data off this machine\n"
+                ),
+            )
+        )
+        self.assertIs(self.by_text(report, "transmit").status, ClaimStatus.ENFORCED_DENY)
+
+    def test_approval_policy_is_a_note_not_backing(self):
+        report = audit_claims(build_codex_harness(self.root))
+        self.assertTrue(
+            any("approval_policy=on-request" in n and "not counted" in n for n in report.notes)
+        )
 
     def test_codex_home_alias_resolves_when_directory_is_not_named_codex(self):
         config = build_codex_harness(

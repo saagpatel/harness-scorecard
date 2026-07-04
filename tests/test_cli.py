@@ -149,12 +149,22 @@ def write_codex_claims_harness(root: Path) -> None:
         encoding="utf-8",
     )
     (root / "config.toml").write_text(
-        'approval_policy = "on-request"\n'
-        'sandbox_mode = "workspace-write"\n'
-        'web_search = "off"\n',
+        'approval_policy = "on-request"\nsandbox_mode = "workspace-write"\nweb_search = "off"\n',
         encoding="utf-8",
     )
-    (root / "hooks.json").write_text(json.dumps({"hooks": {}}), encoding="utf-8")
+    # The push guarantee needs a real hook: sandbox/approval config does not enforce
+    # git semantics, so a hook-less Codex harness would honestly gate exit 1.
+    (root / "hooks").mkdir()
+    (root / "hooks" / "git-safety.sh").write_text(GIT_GUARD, encoding="utf-8")
+    hooks = {
+        "PreToolUse": [
+            {
+                "matcher": "Bash",
+                "hooks": [{"type": "command", "command": "bash hooks/git-safety.sh"}],
+            }
+        ]
+    }
+    (root / "hooks.json").write_text(json.dumps({"hooks": hooks}), encoding="utf-8")
 
 
 class TestClaimsCommand(unittest.TestCase):
@@ -197,7 +207,7 @@ class TestClaimsCommand(unittest.TestCase):
         code, out = run_cli(["claims", str(self.root)])
         self.assertEqual(code, 0)
         self.assertIn("AGENTS.md", out)
-        self.assertIn("ENFORCED (deny)", out)
+        self.assertIn("ENFORCED (hook)", out)
 
     def test_missing_harness_exits_two(self):
         code, _ = run_cli(["claims", str(self.root / "nope")])
