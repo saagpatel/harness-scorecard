@@ -1,8 +1,9 @@
 # Claims Audit — Design
 
-**Status:** implemented (engine `guard_extract.py` + `claims.py`, `claims` subcommand,
-check HS-D5-04, rubric 1.2.0). The check id landed as HS-D5-04 — the next free D5 slot —
-rather than the HS-D5-06 this draft originally penciled in; nothing reserves 04/05.
+**Status:** implemented for Claude Code and Codex (engine `guard_extract.py` + `claims.py`,
+`claims` subcommand, checks HS-D5-04 / CDX-D5-04, rubric 1.3.0). The Claude check id landed
+as HS-D5-04 — the next free D5 slot — rather than the HS-D5-06 this draft originally
+penciled in; nothing reserves 04/05.
 **Lineage:** the Harness Enforcement Auditor lane (scoped 2026-06-27, spikes passed
 2026-07-03) rehomed into this repo. Feasibility evidence: both spike verdicts in the
 operator vault (`wiki/audits/hea-spike-verdict-2026-07-03.md`) — guard-body extraction

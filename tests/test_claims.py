@@ -19,6 +19,7 @@ from harness_scorecard.claims import (
     render_claims_json,
 )
 from harness_scorecard.discovery import HarnessConfig, HookEntry
+from harness_scorecard.discovery_codex import load_codex_harness
 
 RULES_MD = """# Sandboxing
 
@@ -45,6 +46,29 @@ CMD=$(cat | jq -r '.tool_input.command // empty')
 if [ "$(git branch --show-current)" = "main" ] && echo "$CMD" | grep -q 'git push'; then
   exit 2
 fi
+"""
+
+CODEX_PATH_GUARD = """#!/bin/bash
+CMD=$(cat | jq -r '.tool_input.command // empty')
+if echo "$CMD" | grep -qE 'cat /Users/example/vaultbox/.*'; then
+  exit 2
+fi
+"""
+
+CODEX_FALSE_FLAG_GUARD = """#!/bin/bash
+CMD=$(cat | jq -r '.tool_input.command // empty')
+if echo "$CMD" | grep -qE 'git push --force-reset'; then
+  exit 2
+fi
+"""
+
+CODEX_AGENTS_MD = """# AGENTS
+
+## Hard-Deny
+
+- Push to `main` or `master`
+- Read `~/vaultbox`
+- `--force` pushes to any remote
 """
 
 
@@ -96,6 +120,37 @@ def build_harness(
         hard_deny=hard_deny or [],
         default_mode=mode,
     )
+
+
+def build_codex_harness(
+    root: Path,
+    *,
+    agents_md: str = CODEX_AGENTS_MD,
+    hook_scripts: dict[str, str] | None = None,
+    approval_policy: str = "on-request",
+    sandbox_mode: str = "workspace-write",
+) -> object:
+    """Write a synthetic Codex harness to ``root`` and load it through discovery."""
+    (root / "AGENTS.md").write_text(agents_md, encoding="utf-8")
+    (root / "config.toml").write_text(
+        f'approval_policy = "{approval_policy}"\n'
+        f'sandbox_mode = "{sandbox_mode}"\n'
+        'web_search = "off"\n'
+        "\n[sandbox_workspace_write]\n"
+        "network_access = false\n",
+        encoding="utf-8",
+    )
+    hooks: dict = {}
+    hook_scripts = hook_scripts or {}
+    if hook_scripts:
+        (root / "hooks").mkdir()
+        hook_entries = []
+        for name, text in hook_scripts.items():
+            (root / "hooks" / name).write_text(text, encoding="utf-8")
+            hook_entries.append({"type": "command", "command": f"bash hooks/{name}"})
+        hooks = {"PreToolUse": [{"matcher": "Bash", "hooks": hook_entries}]}
+    (root / "hooks.json").write_text(json.dumps({"hooks": hooks}), encoding="utf-8")
+    return load_codex_harness(root)
 
 
 class TestExtraction(unittest.TestCase):
@@ -247,6 +302,69 @@ class TestAuditEndToEnd(unittest.TestCase):
         self.assertEqual(payload["coverage"]["deny_blocks_found"], 1)
         statuses = {f["status"] for f in payload["findings"]}
         self.assertIn("enforced_hook", statuses)
+
+
+class TestCodexClaimsAudit(unittest.TestCase):
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self._tmp.name)
+        self.addCleanup(self._tmp.cleanup)
+
+    def by_text(self, report, needle: str):
+        matches = [f for f in report.findings if needle in f.claim.text]
+        self.assertEqual(len(matches), 1)
+        return matches[0]
+
+    def test_codex_reads_agents_md_and_hooks_json_shell_backing(self):
+        config = build_codex_harness(
+            self.root,
+            agents_md="# AGENTS\n\n## Hard-Deny\n\n- Read `~/vaultbox`\n",
+            hook_scripts={"path-guard.sh": CODEX_PATH_GUARD},
+        )
+        report = audit_claims(config)
+        finding = self.by_text(report, "~/vaultbox")
+        self.assertIs(finding.status, ClaimStatus.ENFORCED_HOOK)
+        self.assertEqual(finding.backing, ["hook:path-guard.sh"])
+
+    def test_codex_false_flag_substring_is_not_backing(self):
+        config = build_codex_harness(
+            self.root,
+            agents_md="# AGENTS\n\n## Hard-Deny\n\n- `--force` pushes to any remote\n",
+            hook_scripts={"flag-guard.sh": CODEX_FALSE_FLAG_GUARD},
+        )
+        report = audit_claims(config)
+        self.assertIs(self.by_text(report, "--force").status, ClaimStatus.PROSE_ONLY)
+
+    def test_codex_logic_guard_caps_at_candidate(self):
+        config = build_codex_harness(
+            self.root,
+            agents_md="# AGENTS\n\n## Hard-Deny\n\n- Push to `main` or `master`\n",
+            hook_scripts={"branch-aware.sh": BRANCH_AWARE_GUARD},
+            approval_policy="never",
+            sandbox_mode="danger-full-access",
+        )
+        report = audit_claims(config)
+        finding = self.by_text(report, "Push to")
+        self.assertIs(finding.status, ClaimStatus.CANDIDATE_LOGIC)
+        self.assertEqual(finding.logic_candidates, ["branch-aware.sh"])
+        self.assertEqual(finding.backing, [])
+
+    def test_codex_mode_flip_changes_config_backing(self):
+        agents_md = "# AGENTS\n\n## Hard-Deny\n\n- Push to `main` or `master`\n"
+        effective = audit_claims(build_codex_harness(self.root, agents_md=agents_md))
+        self.assertIs(self.by_text(effective, "Push to").status, ClaimStatus.ENFORCED_DENY)
+
+        with tempfile.TemporaryDirectory() as other:
+            bypassed = audit_claims(
+                build_codex_harness(
+                    Path(other),
+                    agents_md=agents_md,
+                    approval_policy="never",
+                    sandbox_mode="danger-full-access",
+                )
+            )
+        self.assertIs(self.by_text(bypassed, "Push to").status, ClaimStatus.PROSE_ONLY)
+        self.assertTrue(any("effective bypass" in note for note in bypassed.notes))
 
 
 if __name__ == "__main__":

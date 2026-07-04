@@ -229,6 +229,12 @@ FAILURE_MODES: dict[str, str] = {
         "Nothing blocks writes to ~/.codex config beyond the sandbox default, because there is no "
         "dedicated self-protection hook."
     ),
+    "CDX-D5-04": (
+        "AGENTS.md promises a hard block ('never push main', 'never rewrite ~/.codex') that no "
+        "hooks.json shell deny hook or effective Codex config gate backs under the active "
+        "approval/sandbox mode. The agent is constrained by surviving enforcement, not by prose "
+        "alone."
+    ),
     # D6 — Verification
     "CDX-D6-01": (
         "The agent claims completion with no verification, because there is no Stop verification "

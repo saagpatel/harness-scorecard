@@ -16,7 +16,6 @@ from typing import TYPE_CHECKING
 from harness_scorecard.badge import render_badge
 from harness_scorecard.claims import audit_claims, render_claims_console, render_claims_json
 from harness_scorecard.diff import diff_scorecards, render_diff_console, render_diff_json
-from harness_scorecard.discovery import load_harness
 from harness_scorecard.dispatch import HARNESS_TYPES, select_adapter
 from harness_scorecard.explain import (
     all_check_ids,
@@ -190,7 +189,14 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Audit the rules prose: which stated guarantees are actually enforced "
         "under the active permission mode.",
     )
-    claims.add_argument("path", help="Path to a Claude Code harness directory (e.g. ~/.claude).")
+    claims.add_argument("path", help="Path to a harness directory (e.g. ~/.claude or ~/.codex).")
+    claims.add_argument(
+        "--type",
+        dest="harness_type",
+        choices=list(HARNESS_TYPES),
+        default="auto",
+        help="Harness type (default: auto-detect Claude Code vs Codex).",
+    )
     claims.add_argument(
         "--format",
         choices=["console", "json"],
@@ -276,7 +282,7 @@ def _run_scan(args: argparse.Namespace) -> int:
 def _run_claims(args: argparse.Namespace) -> int:
     root = Path(args.path).expanduser()
     try:
-        config = load_harness(root)
+        config, _checks = select_adapter(root, args.harness_type)
     except (OSError, ValueError) as exc:
         print(f"error: {redact_text(str(exc))}", file=sys.stderr)
         return 2
