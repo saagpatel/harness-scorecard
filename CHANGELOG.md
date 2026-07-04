@@ -6,6 +6,8 @@ All notable changes to Harness Scorecard are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.13.0] - 2026-07-04
+
 ### Changed
 
 - **CDX-D4-03 no longer gives `approval_policy = "on-request"` full gate credit** (rubric

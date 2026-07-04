@@ -1,6 +1,6 @@
 [project]
 name = "harness-scorecard"
-version = "1.12.0"
+version = "1.13.0"
 description = "A read-only linter and A-F maturity grader for coding-agent harnesses (Claude Code, Codex)."
 readme = "README.md"
 license = "MIT"
