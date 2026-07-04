@@ -24,7 +24,10 @@ This repo publishes two surfaces:
 4. Create the exact release tag, for example `v1.13.0`.
 5. Wait for the `Publish` GitHub Actions workflow to pass.
 6. Verify the PyPI release page and JSON API show the new version and both artifacts.
-7. Move the `v1` major tag to the same commit as the exact release tag.
+7. Move the `v1` major tag to the same commit as the exact release tag. The
+   publish workflow is intentionally filtered to exact semver tags
+   (`v[0-9]+.[0-9]+.[0-9]+`), so moving `v1` should not attempt a second PyPI
+   upload.
 8. Create the GitHub release after PyPI is live.
 
 ## Trusted Publishing Failure
