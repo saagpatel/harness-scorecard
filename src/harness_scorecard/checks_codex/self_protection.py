@@ -11,7 +11,15 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from harness_scorecard.checks.base import Check, CheckOutcome, failed, passed
+from harness_scorecard.checks.base import (
+    Check,
+    CheckOutcome,
+    failed,
+    not_applicable,
+    partial,
+    passed,
+)
+from harness_scorecard.claims import ENFORCED_STATUSES, ClaimStatus, audit_claims
 from harness_scorecard.discovery_codex import CodexConfig
 from harness_scorecard.models import Detectability, Grade, Severity
 
@@ -77,6 +85,40 @@ def _self_protect_hook(config: CodexConfig) -> CheckOutcome:
     return failed("No hook guards writes to ~/.codex config, hooks, or AGENTS.md.")
 
 
+def _check_stated_guarantees(config: CodexConfig) -> CheckOutcome:
+    report = audit_claims(config)
+    hard = [f for f in report.findings if f.claim.hard_deny]
+    if not hard:
+        return not_applicable(
+            "The Codex instructions state no hard guarantees; nothing to verify. A harness "
+            "must never score worse for documenting its rules."
+        )
+    backed = [f for f in hard if f.status in ENFORCED_STATUSES]
+    prose_only = [f for f in hard if f.status is ClaimStatus.PROSE_ONLY]
+    pending = [f for f in hard if f.status is ClaimStatus.CANDIDATE_LOGIC]
+    if not prose_only and not pending:
+        return passed(
+            f"All {len(hard)} stated hard guarantees have enforcement backing under "
+            f"{report.mode}.",
+            evidence=[f"{f.claim.source}: {f.status.value}" for f in hard],
+        )
+    if not backed and prose_only:
+        return failed(
+            "Stated hard guarantees have no surviving enforcement under "
+            f"{report.mode} -- the instructions promise blocks that nothing backs.",
+            evidence=[f"{f.claim.source}: prose-only -- {f.claim.text[:80]}" for f in prose_only],
+        )
+    evidence = [f"{f.claim.source}: prose-only -- {f.claim.text[:80]}" for f in prose_only]
+    evidence.extend(
+        f"{f.claim.source}: logic-guard candidate, needs manual review" for f in pending
+    )
+    return partial(
+        f"{len(backed)}/{len(hard)} stated hard guarantees are backed; "
+        f"{len(prose_only)} prose-only, {len(pending)} pending manual review.",
+        evidence=evidence,
+    )
+
+
 CHECKS: list[Check[CodexConfig]] = [
     Check(
         id="CDX-D5-01",
@@ -116,6 +158,20 @@ CHECKS: list[Check[CodexConfig]] = [
             r"\bCODEX_SELF_WRITE_RE\b",
             r"self[_\s-]?protect",
             r"\.codex/(?:hooks|agents|config)",
+        ),
+    ),
+    Check(
+        id="CDX-D5-04",
+        dimension="D5",
+        title="Stated hard guarantees have enforcement backing",
+        weight=4,
+        evaluate=_check_stated_guarantees,
+        severity=Severity.HIGH,
+        detectability=Detectability.PARTIAL,
+        remediation=(
+            "For every prose-only hard guarantee, add real Codex backing under the active "
+            "approval/sandbox mode: a hooks.json shell deny hook or an effective config gate. "
+            "Run `harness-scorecard claims <path>` for the per-claim ledger."
         ),
     ),
 ]

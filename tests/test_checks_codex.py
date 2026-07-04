@@ -1,5 +1,6 @@
 """Codex check suite (D1/D4/D5): fixtures plus targeted gate and partial-credit cases."""
 
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -8,6 +9,7 @@ from harness_scorecard.checks_codex import CODEX_CHECKS
 from harness_scorecard.discovery_codex import CodexConfig, load_codex_harness
 from harness_scorecard.models import Status
 from harness_scorecard.parsing import HookEntry
+from tests.test_claims import build_codex_harness
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -151,6 +153,9 @@ class TestD4DestructiveGit(unittest.TestCase):
 
 
 class TestD5SelfProtection(unittest.TestCase):
+    def test_claims_check_registered(self) -> None:
+        self.assertIn("CDX-D5-04", _BY_ID)
+
     def test_sandbox_protects_harness_by_default(self) -> None:
         config = make_codex_config(sandbox_mode="workspace-write")
         self.assertEqual(get_check("CDX-D5-01").run(config).status, Status.PASS)
@@ -196,6 +201,28 @@ class TestD5SelfProtection(unittest.TestCase):
             get_check("CDX-D5-02").run(make_codex_config(has_agents_md=False)).status,
             Status.FAIL,
         )
+
+    def test_claims_check_na_when_no_hard_guarantees(self) -> None:
+        config = make_codex_config(has_agents_md=False)
+        self.assertEqual(get_check("CDX-D5-04").run(config).status, Status.NOT_APPLICABLE)
+
+    def test_claims_check_passes_when_config_backs_hard_guarantee(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            config = build_codex_harness(
+                Path(tmp),
+                agents_md="# AGENTS\n\n## Hard-Deny\n\n- Push to `main` or `master`\n",
+            )
+            self.assertEqual(get_check("CDX-D5-04").run(config).status, Status.PASS)
+
+    def test_claims_check_fails_when_bypass_leaves_prose_only(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            config = build_codex_harness(
+                Path(tmp),
+                agents_md="# AGENTS\n\n## Hard-Deny\n\n- Push to `main` or `master`\n",
+                approval_policy="never",
+                sandbox_mode="danger-full-access",
+            )
+            self.assertEqual(get_check("CDX-D5-04").run(config).status, Status.FAIL)
 
 
 if __name__ == "__main__":

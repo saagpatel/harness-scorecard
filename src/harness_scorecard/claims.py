@@ -30,12 +30,12 @@ import shlex
 from dataclasses import asdict, dataclass, field
 from enum import StrEnum
 from pathlib import Path
-from typing import TYPE_CHECKING
 
+from harness_scorecard.discovery import HarnessConfig
+from harness_scorecard.discovery_codex import CodexConfig
 from harness_scorecard.guard_extract import extract_deny_blocks
 
-if TYPE_CHECKING:
-    from harness_scorecard.discovery import HarnessConfig
+type ClaimsConfig = HarnessConfig | CodexConfig
 
 
 class ClaimClass(StrEnum):
@@ -298,7 +298,9 @@ def match_tokens(tokens: list[str], haystack: str) -> list[str]:
 
 _SCRIPT_SUFFIXES = (".sh", ".bash")
 # Live-config prefixes that the audited directory stands in for.
-_ROOT_ALIAS_PREFIXES = ("~/.claude/", "$HOME/.claude/", "$CLAUDE_CONFIG_DIR/")
+_CLAUDE_ROOT_ALIAS_PREFIXES = ("~/.claude/", "$HOME/.claude/", "$CLAUDE_CONFIG_DIR/")
+_CODEX_ROOT_ALIAS_PREFIXES = ("~/.codex/", "$HOME/.codex/", "$CODEX_HOME/")
+_CODEX_GATED_APPROVALS = ("untrusted", "on-request")
 
 _QUALIFIER_NOTE = (
     "Qualifiers are not semantically verified: a match means the action is guarded, not "
@@ -306,7 +308,15 @@ _QUALIFIER_NOTE = (
 )
 
 
-def _resolve_hook_script(command: str, root: Path) -> Path | None:
+def _root_alias_prefixes(config: ClaimsConfig) -> tuple[str, ...]:
+    if isinstance(config, CodexConfig):
+        return _CODEX_ROOT_ALIAS_PREFIXES
+    return _CLAUDE_ROOT_ALIAS_PREFIXES
+
+
+def _resolve_hook_script(
+    command: str, root: Path, alias_prefixes: tuple[str, ...]
+) -> Path | None:
     """Find the shell script a hook command runs, or ``None`` (reported as unread)."""
     try:
         tokens = shlex.split(command)
@@ -316,7 +326,7 @@ def _resolve_hook_script(command: str, root: Path) -> Path | None:
         cleaned = token.strip("\"'")
         if not cleaned.endswith(_SCRIPT_SUFFIXES):
             continue
-        for prefix in _ROOT_ALIAS_PREFIXES:
+        for prefix in alias_prefixes:
             if cleaned.startswith(prefix):
                 candidate = root / cleaned[len(prefix) :]
                 if candidate.is_file():
@@ -349,16 +359,17 @@ class _DenyUniverse:
     scripts_unread: list[str] = field(default_factory=list)
 
 
-def _build_deny_universe(config: HarnessConfig) -> _DenyUniverse:
+def _build_deny_universe(config: ClaimsConfig) -> _DenyUniverse:
     """Extract the deny sets of every readable shell guard the harness registers."""
     universe = _DenyUniverse()
+    alias_prefixes = _root_alias_prefixes(config)
     seen_commands: set[str] = set()
     seen_scripts: set[Path] = set()
     for hook in config.hooks:
         if hook.command in seen_commands:
             continue
         seen_commands.add(hook.command)
-        script = _resolve_hook_script(hook.command, config.root)
+        script = _resolve_hook_script(hook.command, config.root, alias_prefixes)
         if script is None:
             universe.scripts_unread.append(_short_command(hook.command))
             continue
@@ -383,9 +394,95 @@ def _build_deny_universe(config: HarnessConfig) -> _DenyUniverse:
     return universe
 
 
-def _audit_notes(config: HarnessConfig, universe: _DenyUniverse) -> list[str]:
+def _codex_home_writable(config: CodexConfig) -> bool:
+    codex_home = config.root.expanduser()
+    for raw in config.writable_roots:
+        try:
+            writable = Path(raw).expanduser()
+        except (ValueError, OSError):
+            continue
+        if ".codex" in writable.parts:
+            return True
+        if codex_home == writable or codex_home.is_relative_to(writable):
+            return True
+    return False
+
+
+def _claim_sources(config: ClaimsConfig) -> list[tuple[str, str]]:
+    root = config.root
+    sources: list[tuple[str, str]] = []
+    if isinstance(config, CodexConfig):
+        if config.has_agents_md:
+            sources.append(("AGENTS.md", _read(root / "AGENTS.md") or ""))
+        sources.extend(
+            (f"agents/{name}", _read(root / "agents" / name) or "")
+            for name in config.agent_files
+        )
+        return sources
+
+    if config.has_claude_md:
+        sources.append(("CLAUDE.md", _read(root / "CLAUDE.md") or ""))
+    sources.extend(
+        (f"rules/{name}", _read(root / "rules" / name) or "") for name in config.rule_files
+    )
+    return sources
+
+
+def _codex_config_backing(config: CodexConfig) -> list[str]:
+    backing: list[str] = []
+    if config.approval_policy in _CODEX_GATED_APPROVALS:
+        backing.append(
+            f"approval_policy:{config.approval_policy} gates command execution before run: "
+            "push commit merge force main master rm delete drop truncate install deploy publish"
+        )
+    if config.network_blocked:
+        backing.append(
+            f"sandbox:{config.sandbox_mode} denies outbound network access: "
+            "network egress exfil transmit curl wget"
+        )
+    if not config.sandbox_disabled and not _codex_home_writable(config):
+        backing.append(
+            f"sandbox:{config.sandbox_mode} keeps ~/.codex out of write scope: "
+            "write edit mutate overwrite delete rm ~/.codex AGENTS.md config.toml hooks.json"
+        )
+    if config.env_secrets_scrubbed:
+        backing.append(
+            "shell_environment_policy keeps secret-looking env vars out of commands: "
+            "token secret credential password key"
+        )
+    return backing
+
+
+def _declarative_backing(config: ClaimsConfig) -> list[tuple[str, str]]:
+    if isinstance(config, CodexConfig):
+        return [("config", rule) for rule in _codex_config_backing(config)]
+    hard_deny_rules = config.hard_deny if config.hard_deny_effective else []
+    return [("deny", glob) for glob in config.deny] + [
+        ("hard_deny", rule) for rule in hard_deny_rules
+    ]
+
+
+def _audit_mode(config: ClaimsConfig) -> str:
+    if isinstance(config, CodexConfig):
+        return f"sandbox={config.sandbox_mode}, approval={config.approval_policy}"
+    return config.default_mode
+
+
+def _hard_deny_effective(config: ClaimsConfig) -> bool:
+    if isinstance(config, CodexConfig):
+        return not config.is_bypass
+    return config.hard_deny_effective
+
+
+def _audit_notes(config: ClaimsConfig, universe: _DenyUniverse) -> list[str]:
     notes = [_QUALIFIER_NOTE]
-    if config.is_bypass and config.hard_deny:
+    if isinstance(config, CodexConfig) and config.is_bypass:
+        notes.append(
+            "Codex is in effective bypass (sandbox_mode=danger-full-access and "
+            "approval_policy=never); sandbox and approval-policy config were not counted as "
+            "claim backing."
+        )
+    if isinstance(config, HarnessConfig) and config.is_bypass and config.hard_deny:
         notes.append(
             f"autoMode.hard_deny ({len(config.hard_deny)} rules) is INERT under "
             "bypassPermissions and was not counted as backing."
@@ -399,33 +496,25 @@ def _audit_notes(config: HarnessConfig, universe: _DenyUniverse) -> list[str]:
     return notes
 
 
-def audit_claims(config: HarnessConfig) -> ClaimsReport:
+def audit_claims(config: ClaimsConfig) -> ClaimsReport:
     """Run the full claims audit against a loaded harness (read-only)."""
     root = config.root
-    sources: list[tuple[str, str]] = []
-    if config.has_claude_md:
-        sources.append(("CLAUDE.md", _read(root / "CLAUDE.md") or ""))
-    sources.extend(
-        (f"rules/{name}", _read(root / "rules" / name) or "") for name in config.rule_files
-    )
-    claims = extract_claims(sources)
+    claims = extract_claims(_claim_sources(config))
     universe = _build_deny_universe(config)
-    hard_deny_rules = config.hard_deny if config.hard_deny_effective else []
+    declarative = _declarative_backing(config)
     findings = [
-        _match_claim(
-            c, universe.pattern_index, config.deny, hard_deny_rules, universe.logic_sources
-        )
+        _match_claim(c, universe.pattern_index, declarative, universe.logic_sources)
         for c in claims
     ]
     return ClaimsReport(
         harness_path=str(root),
-        mode=config.default_mode,
-        hard_deny_effective=config.hard_deny_effective,
+        mode=_audit_mode(config),
+        hard_deny_effective=_hard_deny_effective(config),
         findings=findings,
         blocks_found=universe.blocks_found,
         blocks_extracted=universe.blocks_extracted,
         blocks_logic=universe.blocks_found - universe.blocks_extracted,
-        deny_glob_count=len(config.deny),
+        deny_glob_count=len(declarative),
         scripts_read=sorted(universe.scripts_read),
         scripts_unread=sorted(set(universe.scripts_unread)),
         notes=_audit_notes(config, universe),
@@ -444,17 +533,16 @@ def _read(path: Path) -> str | None:
 def _match_claim(
     claim: Claim,
     pattern_index: list[tuple[str, str]],
-    deny_globs: list[str],
-    hard_deny_rules: list[str],
+    declarative_rules: list[tuple[str, str]],
     logic_sources: dict[str, str],
 ) -> ClaimFinding:
     if claim.claim_class is ClaimClass.STYLE:
         return ClaimFinding(claim, ClaimStatus.STYLE_RULE)
 
     hook_hits = sorted({guard for guard, blob in pattern_index if match_tokens(claim.tokens, blob)})
-    deny_hits = [glob for glob in deny_globs if match_tokens(claim.tokens, glob)]
-    hard_hits = [rule for rule in hard_deny_rules if match_tokens(claim.tokens, rule)]
-    declarative = [f"deny:{g}" for g in deny_hits] + [f"hard_deny:{r}" for r in hard_hits]
+    declarative = [
+        f"{kind}:{rule}" for kind, rule in declarative_rules if match_tokens(claim.tokens, rule)
+    ]
 
     if hook_hits and declarative:
         status = ClaimStatus.ENFORCED_BOTH
@@ -493,7 +581,7 @@ def render_claims_console(report: ClaimsReport) -> str:
             f"coverage: {report.blocks_found} deny blocks across "
             f"{len(report.scripts_read)} shell guard(s) — {report.blocks_extracted} "
             f"extracted, {report.blocks_logic} logic-flagged (manual review); "
-            f"{report.deny_glob_count} permissions.deny globs"
+            f"{report.deny_glob_count} declarative backing rule(s)"
         ),
         "",
     ]

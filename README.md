@@ -183,8 +183,9 @@ below the bar — drop it in CI to keep a whole team's harnesses above a floor.
 ### Audit your own stated guarantees
 
 The rubric grades against *our* expectations. `claims` grades against *yours*: it parses
-the rules prose (CLAUDE.md + `rules/*.md`), extracts every enforcement claim, and answers
-per claim — under the active permission mode — *is this actually enforced, and by what?*
+the rules prose (Claude Code: CLAUDE.md + `rules/*.md`; Codex: AGENTS.md + inventoried
+instruction files), extracts every enforcement claim, and answers per claim — under the
+active permission mode — *is this actually enforced, and by what?*
 
 ```text
 $ harness-scorecard claims ~/.claude
@@ -205,7 +206,7 @@ under-count, but it cannot claim a guarantee is enforced when it isn't. Exit is 
 when a hard-deny-class claim is prose-only (`--strict` widens that to every enforcement
 claim); `--format json` / `--json FILE` emit the machine ledger. The graded counterpart
 is check `HS-D5-04`, which is N/A — never a penalty — for harnesses that state no hard
-guarantees.
+guarantees. Codex harnesses get the mirrored check `CDX-D5-04`.
 
 ### Grade badge
 

@@ -143,6 +143,20 @@ def write_claims_harness(root: Path, *, include_guard: bool = True, extra_rule: 
     (root / "settings.json").write_text(json.dumps(settings), encoding="utf-8")
 
 
+def write_codex_claims_harness(root: Path) -> None:
+    (root / "AGENTS.md").write_text(
+        "# AGENTS\n\n## Hard-Deny\n\n- Push to `main` or `master`\n",
+        encoding="utf-8",
+    )
+    (root / "config.toml").write_text(
+        'approval_policy = "on-request"\n'
+        'sandbox_mode = "workspace-write"\n'
+        'web_search = "off"\n',
+        encoding="utf-8",
+    )
+    (root / "hooks.json").write_text(json.dumps({"hooks": {}}), encoding="utf-8")
+
+
 class TestClaimsCommand(unittest.TestCase):
     def setUp(self):
         self._tmp = tempfile.TemporaryDirectory()
@@ -177,6 +191,13 @@ class TestClaimsCommand(unittest.TestCase):
         payload = json.loads(out)
         self.assertEqual(payload["coverage"]["deny_blocks_found"], 1)
         self.assertIn("enforced_hook", {f["status"] for f in payload["findings"]})
+
+    def test_codex_harness_is_auto_detected(self):
+        write_codex_claims_harness(self.root)
+        code, out = run_cli(["claims", str(self.root)])
+        self.assertEqual(code, 0)
+        self.assertIn("AGENTS.md", out)
+        self.assertIn("ENFORCED (deny)", out)
 
     def test_missing_harness_exits_two(self):
         code, _ = run_cli(["claims", str(self.root / "nope")])
