@@ -24,6 +24,9 @@ def make_codex_config(**overrides: object) -> CodexConfig:
     defaults: dict[str, object] = {
         "root": Path("/tmp/codex"),
         "harness_type": "codex",
+        "model": "gpt-5.5",
+        "review_model": None,
+        "model_reasoning_effort": "medium",
         "approval_policy": "on-request",
         "sandbox_mode": "workspace-write",
         "web_search": "off",

@@ -6,6 +6,13 @@ All notable changes to Harness Scorecard are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **Codex routing discipline checks.** `CDX-D7-03` flags overpowered default reasoning
+  (`high` as PARTIAL, `xhigh`/`max` as FAIL), and `CDX-D7-04` requires launch-preview
+  max/ultra-style delegation to stay out of write-enabled default lanes unless it is read-only,
+  bounded, and provenance-tracked.
+
 ## [1.13.1] - 2026-07-04
 
 ### Changed
