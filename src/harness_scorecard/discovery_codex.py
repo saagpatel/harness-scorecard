@@ -68,6 +68,9 @@ class CodexConfig:
 
     root: Path
     harness_type: str
+    model: str | None
+    review_model: str | None
+    model_reasoning_effort: str | None
     approval_policy: str
     sandbox_mode: str
     web_search: str
@@ -227,6 +230,11 @@ def load_codex_harness(root: Path | str) -> CodexConfig:
     return CodexConfig(
         root=root,
         harness_type=HARNESS_TYPE_CODEX,
+        model=str(raw["model"]) if "model" in raw else None,
+        review_model=str(raw["review_model"]) if "review_model" in raw else None,
+        model_reasoning_effort=(
+            str(raw["model_reasoning_effort"]) if "model_reasoning_effort" in raw else None
+        ),
         approval_policy=str(raw.get("approval_policy", "on-request")),
         sandbox_mode=str(raw.get("sandbox_mode", SANDBOX_READ_ONLY)),
         web_search=str(raw.get("web_search", "off")),

@@ -68,6 +68,49 @@ class TestD7Subagents(unittest.TestCase):
         self.assertEqual(get_check("CDX-D7-02").run(config).status, Status.FAIL)
 
 
+class TestD7RoutingDiscipline(unittest.TestCase):
+    def test_medium_default_reasoning_passes(self) -> None:
+        config = make_codex_config(model_reasoning_effort="medium")
+        self.assertEqual(get_check("CDX-D7-03").run(config).status, Status.PASS)
+
+    def test_high_default_reasoning_is_partial(self) -> None:
+        config = make_codex_config(model_reasoning_effort="high")
+        self.assertEqual(get_check("CDX-D7-03").run(config).status, Status.PARTIAL)
+
+    def test_xhigh_default_reasoning_fails(self) -> None:
+        config = make_codex_config(model_reasoning_effort="xhigh")
+        self.assertEqual(get_check("CDX-D7-03").run(config).status, Status.FAIL)
+
+    def test_max_reasoning_in_write_enabled_default_fails_preview_gate(self) -> None:
+        config = make_codex_config(
+            model_reasoning_effort="max",
+            sandbox_mode="workspace-write",
+            agents_max_threads=4,
+            agents_max_depth=1,
+            agents=[CodexAgent("planner", None, "agents/planner.toml")],
+        )
+        self.assertEqual(get_check("CDX-D7-04").run(config).status, Status.FAIL)
+
+    def test_max_reasoning_read_only_bounded_passes_preview_gate(self) -> None:
+        config = make_codex_config(
+            model_reasoning_effort="max",
+            sandbox_mode="read-only",
+            agents_max_threads=4,
+            agents_max_depth=1,
+            agents=[CodexAgent("planner", None, "agents/planner.toml")],
+        )
+        self.assertEqual(get_check("CDX-D7-04").run(config).status, Status.PASS)
+
+    def test_ultra_marker_without_tracked_roles_is_partial(self) -> None:
+        config = make_codex_config(
+            sandbox_mode="read-only",
+            agents_max_threads=4,
+            agents_max_depth=1,
+            raw_config={"features": {"ultra_mode": True}},
+        )
+        self.assertEqual(get_check("CDX-D7-04").run(config).status, Status.PARTIAL)
+
+
 class TestD8Recovery(unittest.TestCase):
     def test_danger_sandbox_is_not_recoverable(self) -> None:
         config = make_codex_config(sandbox_mode="danger-full-access")
