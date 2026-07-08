@@ -150,6 +150,10 @@ def check_receipt_discipline(config: ReceiptConfig) -> CheckOutcome:  # noqa: PL
     repo = _git_root(config.root)
     if repo is None:
         return not_applicable("No containing git worktree; receipt discipline is repo-scoped.")
+    if config.root.resolve() != repo.resolve():
+        return not_applicable(
+            "Receipt discipline is repo-scoped and only applies when scanning a git worktree root."
+        )
 
     baseline = _baseline_ref(repo)
     if baseline is None:
