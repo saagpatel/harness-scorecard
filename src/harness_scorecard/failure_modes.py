@@ -253,6 +253,16 @@ FAILURE_MODES: dict[str, str] = {
         "A subagent role runs approval_policy = never, bypassing the human gate for everything it "
         "does even when the top-level policy is stricter."
     ),
+    "CDX-D7-03": (
+        "The base Codex route silently becomes the deepest reasoning lane, so ordinary tasks "
+        "inherit launch-preview cost, latency, and over-delegation risk instead of opting into a "
+        "named deep-planning profile."
+    ),
+    "CDX-D7-04": (
+        "A launch-preview max or ultra-style delegation mode lands in a write-enabled default "
+        "lane before official syntax and smoke receipts exist, widening subagent blast radius "
+        "without read-only boundaries, fan-out limits, or tracked role definitions."
+    ),
     # D8 — Recovery
     "CDX-D8-01": (
         "Changes are not confined for rollback, because sandbox_mode = danger-full-access lets "

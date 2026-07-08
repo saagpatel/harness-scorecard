@@ -379,6 +379,12 @@ approval inside that directory.
 - **CDX-D7-01 — Fan-out bounded (2, STATIC)**: `max_threads` AND `max_depth` set (one → PARTIAL).
 - **CDX-D7-02 — No role bypasses approval (1, STATIC)**: no `[agents.*]` runs
   `approval_policy = "never"` (N/A when no roles are declared).
+- **CDX-D7-03 — Default reasoning effort is bounded (1, STATIC)**: the base config stays at
+  low/medium/default reasoning. `high` is PARTIAL because it should normally be an explicit
+  profile; `xhigh`/`max` FAIL because ordinary work inherits the deepest lane.
+- **CDX-D7-04 — Launch-preview delegation is gated (1, PARTIAL)**: launch-preview `max`
+  reasoning or ultra-style config markers must stay out of write-enabled defaults. Read-only,
+  bounded, provenance-tracked profiles can pass; write-enabled defaults fail.
 
 **D8 — Recovery (weight 2).** Codex has no PreCompact analog; the checks credit what its
 surface offers.

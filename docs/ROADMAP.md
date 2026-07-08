@@ -3,21 +3,23 @@
 Harness Scorecard 1.0 grades Claude Code and Codex harness configs against a 10-dimension
 red-team rubric. This is the candidate backlog beyond 1.0 — ordered by leverage, not commitment.
 
-## Near-term (1.1)
+## Recently landed
 
-- **`--diff` / grade-delta** — grade two configs (or the same config over time) and report what
-  changed: which checks flipped, which dimension scores moved, whether a gate newly trips. The
-  obvious CI use: fail a PR that *lowers* the harness grade.
-- **Baseline / waiver file** — a `.harness-scorecard.toml` that records accepted findings
-  (with a reason) so a known, deliberate gap stops re-surfacing as noise. Waivers are listed in
-  the report, never silently hidden.
-- **Dispatcher escape hatch** — the honest limit today is that an opaque hook dispatcher
-  (`pre_tool_use_dispatch.py`) hides its security logic from static analysis, so it under-grades.
-  Let a harness declare, in a small manifest, what its dispatcher enforces, so the grader can
-  credit it without executing anything. Keeps the tool static while closing the under-credit gap.
-- **Codex trust-level discipline (D4)** — a dedicated check on `[projects.*].trust_level`: a
-  harness that marks hundreds of directories `trusted` has quietly eroded its approval floor.
-  (The signal that prompted this: a real `~/.codex` with 343 trusted projects.)
+- **`--diff` / grade-delta** — shipped in 1.1.0.
+- **Baseline / waiver file** — shipped in 1.2.0.
+- **Dispatcher escape hatch** — shipped in 1.2.0.
+- **Codex trust-level discipline (D4)** — shipped as `CDX-D4-04` in 1.2.0. The
+  check counts `[projects.*].trust_level = "trusted"` entries and reports broad
+  trust surfaces as approval-floor erosion.
+
+## Near-term
+
+- **Model routing discipline follow-through** — `CDX-D7-03` and `CDX-D7-04` now cover default
+  reasoning effort and launch-preview max/ultra gating. Next: add fixtures once the official
+  Codex config syntax for 5.6 preview modes is visible.
+- **Cache-breakpoint hygiene** — once GPT-5.6 cache breakpoint syntax is official, check that
+  stable policy/rubric context comes before volatile project state and that cache-write cost is
+  not silently hidden.
 
 ## Mid-term (1.x)
 

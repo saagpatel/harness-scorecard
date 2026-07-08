@@ -19,6 +19,9 @@ class TestStrongCodexHarness(unittest.TestCase):
 
     def test_core_fields(self) -> None:
         self.assertEqual(self.config.harness_type, HARNESS_TYPE_CODEX)
+        self.assertEqual(self.config.model, "gpt-5.5")
+        self.assertIsNone(self.config.review_model)
+        self.assertIsNone(self.config.model_reasoning_effort)
         self.assertEqual(self.config.approval_policy, "on-request")
         self.assertEqual(self.config.sandbox_mode, "workspace-write")
         self.assertEqual(self.config.web_search, "off")
