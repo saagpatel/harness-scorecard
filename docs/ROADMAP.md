@@ -13,7 +13,8 @@ red-team rubric. This is the candidate backlog beyond 1.0 — ordered by leverag
   trust surfaces as approval-floor erosion.
 - **GPT-5.6 routing discipline** — user/profile/trusted-project precedence, known model-effort
   compatibility, explicit Max/Ultra gates, UNKNOWN semantics, and red-team score calibration now
-  land through `CDX-D7-03` / `CDX-D7-04`.
+  land through `CDX-D7-03` / `CDX-D7-04`. A separate read-only maintainer monitor reports official
+  schema or installed model-catalog drift without changing the static grade.
 
 ## Near-term
 

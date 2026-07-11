@@ -373,3 +373,7 @@ uv run --no-sync python -m unittest discover -s tests # tests (stdlib runner, ze
 uv run --no-sync ruff check src/ tests/               # lint
 uv run --no-sync ty check src/                        # type check
 ```
+
+Codex routing assumptions have a separate read-only
+[schema and model-catalog drift monitor](docs/codex-routing-facts.md). Its live result is
+maintainer evidence only and never changes the static grade.
