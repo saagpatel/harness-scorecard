@@ -65,6 +65,11 @@ def failed(message: str, evidence: Iterable[str] = ()) -> CheckOutcome:
     return CheckOutcome(Status.FAIL, message, list(evidence))
 
 
+def unknown(message: str, evidence: Iterable[str] = ()) -> CheckOutcome:
+    """A material signal static inspection cannot resolve; excluded from the grade."""
+    return CheckOutcome(Status.UNKNOWN, message, list(evidence))
+
+
 def not_applicable(message: str, evidence: Iterable[str] = ()) -> CheckOutcome:
     """A check that does not apply to this harness; excluded from the dimension denominator."""
     return CheckOutcome(Status.NOT_APPLICABLE, message, list(evidence))

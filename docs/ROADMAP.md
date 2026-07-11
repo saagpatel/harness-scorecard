@@ -11,12 +11,12 @@ red-team rubric. This is the candidate backlog beyond 1.0 — ordered by leverag
 - **Codex trust-level discipline (D4)** — shipped as `CDX-D4-04` in 1.2.0. The
   check counts `[projects.*].trust_level = "trusted"` entries and reports broad
   trust surfaces as approval-floor erosion.
+- **GPT-5.6 routing discipline** — user/profile/trusted-project precedence, known model-effort
+  compatibility, explicit Max/Ultra gates, UNKNOWN semantics, and red-team score calibration now
+  land through `CDX-D7-03` / `CDX-D7-04`.
 
 ## Near-term
 
-- **Model routing discipline follow-through** — `CDX-D7-03` and `CDX-D7-04` now cover default
-  reasoning effort and launch-preview max/ultra gating. Next: add fixtures once the official
-  Codex config syntax for 5.6 preview modes is visible.
 - **Cache-breakpoint hygiene** — once GPT-5.6 cache breakpoint syntax is official, check that
   stable policy/rubric context comes before volatile project state and that cache-write cost is
   not silently hidden.

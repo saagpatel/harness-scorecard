@@ -8,10 +8,17 @@ All notable changes to Harness Scorecard are documented here. The format follows
 
 ### Added
 
-- **Codex routing discipline checks.** `CDX-D7-03` flags overpowered default reasoning
-  (`high` as PARTIAL, `xhigh`/`max` as FAIL), and `CDX-D7-04` requires launch-preview
-  max/ultra-style delegation to stay out of write-enabled default lanes unless it is read-only,
-  bounded, and provenance-tracked.
+- **GPT-5.6 Codex routing discipline.** `CDX-D7-03` now resolves effective persistent routes
+  across user config, separate profiles, and trusted-project overrides. `CDX-D7-04` requires
+  Max/Ultra to use an explicit profile, with Ultra fan-out and execution gates. Verified Sol,
+  Terra, Luna, GPT-5.5, and GPT-5.4 effort compatibility is distinguished from custom, stale,
+  unsupported, and runtime-selected model state.
+- **`UNKNOWN` check status.** Unverifiable routing, permission, invocation, or runtime state is
+  visible in console, JSON, SARIF, HTML, summaries, and diffs but excluded from scoring. This is
+  a rubric/schema change documented as rubric 1.5.0; badges and exit codes remain grade-based.
+- **Routing red-team fixtures.** Positive, negative, ambiguous, precedence-conflict, prose-only,
+  stale-model, unsupported-marker, trusted-project, and vulnerable/guarded grade-effect cases
+  keep routing claims tied to executable tests.
 
 ## [1.13.1] - 2026-07-04
 

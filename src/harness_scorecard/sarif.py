@@ -1,9 +1,9 @@
 """Render a :class:`Scorecard` to SARIF 2.1.0 so CI (e.g. GitHub code scanning) can ingest it.
 
-Mapping: every rubric check becomes a driver *rule*; every check that did not fully pass
-(``FAIL`` or ``PARTIAL``) becomes a *result* — standard static-analysis semantics where a
-clean subject emits no findings. SARIF ``level`` is derived from the check's severity, with a
-``PARTIAL`` outcome downgraded one notch (a partial mitigation is less alarming than none).
+Mapping: every rubric check becomes a driver *rule*; every actionable or unresolved check
+(``FAIL``, ``PARTIAL``, or ``UNKNOWN``) becomes a *result* — standard static-analysis semantics
+where a clean subject emits no findings. SARIF ``level`` is derived from the check's severity,
+with a ``PARTIAL`` outcome downgraded one notch (a partial mitigation is less alarming than none).
 
 Stdlib-only (``json``, ``hashlib``, ``re``). Privacy boundary: every human-facing free-text
 field read from or about the scanned harness (rule/finding titles, messages, evidence,
@@ -31,7 +31,7 @@ _TOOL_NAME = "harness-scorecard"
 _INFORMATION_URI = "https://github.com/saagpatel/harness-scorecard"
 
 # Only non-passing checks surface as findings; PASS / N/A leave the subject clean.
-_RESULT_STATUSES = (Status.FAIL, Status.PARTIAL)
+_RESULT_STATUSES = (Status.FAIL, Status.PARTIAL, Status.UNKNOWN)
 
 # SARIF level for a FAIL, by severity. A PARTIAL downgrades one notch (see _result_level).
 _SEVERITY_LEVEL: dict[Severity, str] = {
@@ -54,6 +54,8 @@ _WORD = re.compile(r"[A-Za-z0-9]+")
 
 
 def _result_level(check: CheckResult) -> str:
+    if check.status is Status.UNKNOWN:
+        return "note"
     base = _SEVERITY_LEVEL[check.severity]
     return _DOWNGRADE[base] if check.status is Status.PARTIAL else base
 

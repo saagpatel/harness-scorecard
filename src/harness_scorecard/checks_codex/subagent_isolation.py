@@ -14,6 +14,7 @@ from harness_scorecard.checks.base import (
     not_applicable,
     partial,
     passed,
+    unknown,
 )
 from harness_scorecard.discovery_codex import APPROVAL_NEVER, CodexConfig
 from harness_scorecard.models import Detectability, Severity
@@ -29,7 +30,11 @@ def _fanout_bounded(config: CodexConfig) -> CheckOutcome:
         return passed("Subagent fan-out is bounded in both breadth and depth.", bounds)
     if len(bounds) == 1:
         return partial("Only one of max_threads / max_depth bounds subagent fan-out.", bounds)
-    return failed("Subagent fan-out is unbounded: neither max_threads nor max_depth is set.")
+    return unknown(
+        "Neither max_threads nor max_depth is explicit. Current Codex prose documents bounded "
+        "defaults, while the current config schema says an omitted max_threads is unlimited; "
+        "static inspection cannot resolve that runtime contradiction."
+    )
 
 
 def _no_agent_bypasses_approval(config: CodexConfig) -> CheckOutcome:

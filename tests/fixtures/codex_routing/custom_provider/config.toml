@@ -1,0 +1,7 @@
+model = "gpt-5.6-sol"
+model_provider = "local"
+model_reasoning_effort = "max"
+
+[model_providers.local]
+name = "Local"
+base_url = "http://127.0.0.1:8000/v1"

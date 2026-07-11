@@ -254,14 +254,14 @@ FAILURE_MODES: dict[str, str] = {
         "does even when the top-level policy is stricter."
     ),
     "CDX-D7-03": (
-        "The base Codex route silently becomes the deepest reasoning lane, so ordinary tasks "
-        "inherit launch-preview cost, latency, and over-delegation risk instead of opting into a "
-        "named deep-planning profile."
+        "A broad persistent route silently makes ordinary tasks inherit high-cost reasoning, or "
+        "a stale/unsupported model-effort pair receives credit despite having no verified runtime "
+        "meaning. Task-specific profiles are explicit; prose and ambiguous catalog state are not."
     ),
     "CDX-D7-04": (
-        "A launch-preview max or ultra-style delegation mode lands in a write-enabled default "
-        "lane before official syntax and smoke receipts exist, widening subagent blast radius "
-        "without read-only boundaries, fan-out limits, or tracked role definitions."
+        "Max or Ultra loads implicitly for ordinary work, or Ultra can auto-delegate without "
+        "explicit fan-out and execution gates. A guessed ultra marker can also look disciplined "
+        "to a text scanner while being inert configuration."
     ),
     # D8 — Recovery
     "CDX-D8-01": (

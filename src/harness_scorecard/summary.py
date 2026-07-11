@@ -21,16 +21,20 @@ from harness_scorecard.redaction import redact_text
 if TYPE_CHECKING:
     from harness_scorecard.models import CheckResult, Scorecard
 
-_STATUS_LABEL = {Status.FAIL: "FAIL", Status.PARTIAL: "PARTIAL"}
+_STATUS_LABEL = {
+    Status.FAIL: "FAIL",
+    Status.PARTIAL: "PARTIAL",
+    Status.UNKNOWN: "UNKNOWN",
+}
 
 
 def _actionable_findings(card: Scorecard) -> list[CheckResult]:
-    """Every non-passing, non-waived finding (FAIL/PARTIAL), in dimension order."""
+    """Every actionable or unresolved, non-waived finding, in dimension order."""
     return [
         check
         for dim in card.dimensions
         for check in dim.checks
-        if check.status in (Status.FAIL, Status.PARTIAL) and not check.waived
+        if check.status in (Status.FAIL, Status.PARTIAL, Status.UNKNOWN) and not check.waived
     ]
 
 
@@ -71,9 +75,11 @@ def _finding_block(check: CheckResult) -> list[str]:
     gate = f" · gate→{check.gate_cap.value}" if check.is_gate and check.gate_cap else ""
     block = [f"**`{check.id}`** · {label}{gate} — {redact_text(check.title)}", ""]
     quoted: list[str] = []
-    failure_mode = FAILURE_MODES.get(check.id)
+    failure_mode = FAILURE_MODES.get(check.id) if check.status is not Status.UNKNOWN else None
     if failure_mode:
         quoted += _quote("Why", failure_mode)
+    if check.status is Status.UNKNOWN:
+        quoted += _quote("Unknown", check.message)
     if check.remediation:
         if quoted:
             quoted.append(">")

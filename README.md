@@ -75,6 +75,12 @@ dispatcher script hides its logic from static analysis, so the named-guard check
 it. Rather than silently mark it down, the report emits a **caveat** — "a low score here may be
 a static-analysis limit, not a missing guard" — so the grade is never misread as "insecure."
 
+Material state that static files cannot resolve is reported as **UNKNOWN**, never promoted to
+PASS or quietly treated as FAIL. UNKNOWN checks remain visible in console, JSON, SARIF, HTML,
+summaries, and diffs, but are excluded from the numeric grade. Codex invocation flags and
+in-session model changes are one example: persistent routing layers can be graded; the active
+invocation cannot be reconstructed from configuration prose.
+
 ## Proven, not asserted
 
 The rubric claims every gated check traces to a real red-team failure mode. That claim is

@@ -24,6 +24,7 @@ _STATUS_COLOR = {
     "pass": "#1a7f37",
     "partial": "#b08800",
     "fail": "#cf222e",
+    "unknown": "#8250df",
     "not_applicable": "#6e7781",
 }
 
