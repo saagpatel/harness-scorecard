@@ -22,6 +22,7 @@ _STATUS_TAG = {
     Status.PASS: "PASS",
     Status.PARTIAL: "PART",
     Status.FAIL: "FAIL",
+    Status.UNKNOWN: "UNKN",
     Status.NOT_APPLICABLE: "N/A ",
 }
 
@@ -113,6 +114,11 @@ def render_console(card: Scorecard, *, explain: bool = False) -> str:
         f"  Scored {len(card.dimensions)} of {len(DIMENSIONS)} rubric dimensions "
         f"({len(_pending_dimension_ids(card))} specced, pending)."
     )
+    unknown_count = sum(
+        check.status is Status.UNKNOWN for dim in card.dimensions for check in dim.checks
+    )
+    if unknown_count:
+        out.append(f"  Unknown checks excluded from the grade: {unknown_count}.")
     out.append("")
 
     if card.caveats:

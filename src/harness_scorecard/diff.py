@@ -194,6 +194,7 @@ _STATUS_TAG = {
     Status.PASS: "PASS",
     Status.PARTIAL: "PART",
     Status.FAIL: "FAIL",
+    Status.UNKNOWN: "UNKN",
     Status.NOT_APPLICABLE: "N/A ",
     None: "----",
 }

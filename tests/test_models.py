@@ -24,6 +24,9 @@ class TestStatusScore(unittest.TestCase):
     def test_not_applicable_has_no_score(self):
         self.assertIsNone(Status.NOT_APPLICABLE.score)
 
+    def test_unknown_has_no_score(self):
+        self.assertIsNone(Status.UNKNOWN.score)
+
 
 class TestBanding(unittest.TestCase):
     def test_a_band_floor(self):

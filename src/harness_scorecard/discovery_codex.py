@@ -62,6 +62,39 @@ class CodexAgent:
     config_file: str | None
 
 
+@dataclass(frozen=True, slots=True)
+class CodexRoutingRoute:
+    """One statically resolvable persistent routing lane after config precedence."""
+
+    name: str
+    kind: str
+    sources: tuple[str, ...]
+    model: str | None
+    reasoning_effort: str | None
+    approval_policy: str
+    sandbox_mode: str
+    default_permissions: str | None
+    agents_max_threads: int | None
+    agents_max_depth: int | None
+    model_provider: str | None = None
+    issues: tuple[str, ...] = ()
+
+    @property
+    def write_enabled(self) -> bool | None:
+        """Whether execution can write, or ``None`` for an unresolved custom profile."""
+        if self.default_permissions == ":read-only":
+            return False
+        if self.default_permissions in (":workspace", ":danger-full-access"):
+            return True
+        if self.default_permissions:
+            return None
+        return self.sandbox_mode != SANDBOX_READ_ONLY
+
+    @property
+    def approval_disabled(self) -> bool:
+        return self.approval_policy == APPROVAL_NEVER
+
+
 @dataclass(slots=True)
 class CodexConfig:
     """Everything the scorer needs from a Codex harness, parsed once."""
@@ -91,6 +124,8 @@ class CodexConfig:
     has_agents_md: bool
     agent_files: list[str]
     raw_config: dict[str, Any] = field(default_factory=dict)
+    routing_routes: list[CodexRoutingRoute] = field(default_factory=list)
+    routing_issues: list[str] = field(default_factory=list)
 
     # --- effective-floor helpers (the bypass-aware moat for Codex) -----------------
 
@@ -165,15 +200,28 @@ class CodexConfig:
     @property
     def caveats(self) -> list[str]:
         """Advisory notes that reframe the grade (e.g. an opaque hook dispatcher)."""
-        return detect_dispatcher_caveats(self.hooks)
+        return [
+            *detect_dispatcher_caveats(self.hooks),
+            *self.routing_issues,
+            (
+                "Codex invocation flags, --config overrides, and in-session /model or "
+                "/reasoning changes are runtime state; the static grade covers persistent "
+                "config routes only."
+            ),
+        ]
 
 
-def _read_toml(path: Path) -> dict[str, Any]:
+def _read_toml_layer(path: Path) -> tuple[dict[str, Any], str | None]:
+    """Read one optional config layer while retaining parse/read uncertainty."""
     try:
         with path.open("rb") as handle:
-            return tomllib.load(handle)
-    except (tomllib.TOMLDecodeError, OSError):
-        return {}
+            return tomllib.load(handle), None
+    except FileNotFoundError:
+        return {}, None
+    except tomllib.TOMLDecodeError:
+        return {}, f"Cannot resolve routing layer {path}: invalid TOML."
+    except OSError:
+        return {}, f"Cannot resolve routing layer {path}: unreadable."
 
 
 def _as_bool(value: Any) -> bool | None:
@@ -208,6 +256,147 @@ def _parse_trusted_projects(raw: dict[str, Any]) -> list[str]:
     ]
 
 
+def _merge_layers(*layers: dict[str, Any]) -> dict[str, Any]:
+    """Recursively overlay TOML tables in Codex's low-to-high precedence order."""
+    merged: dict[str, Any] = {}
+    for layer in layers:
+        for key, value in layer.items():
+            if isinstance(value, dict) and isinstance(merged.get(key), dict):
+                merged[key] = _merge_layers(_as_dict(merged[key]), value)
+            else:
+                merged[key] = value
+    return merged
+
+
+def _approval_policy(raw: dict[str, Any]) -> str:
+    value = raw.get("approval_policy", "on-request")
+    if isinstance(value, str):
+        return value
+    if isinstance(value, dict) and isinstance(value.get("granular"), dict):
+        return "granular"
+    return "unknown"
+
+
+def _route_from_config(
+    *,
+    name: str,
+    kind: str,
+    sources: tuple[str, ...],
+    raw: dict[str, Any],
+    inherited_issues: tuple[str, ...] = (),
+) -> CodexRoutingRoute:
+    agents = _as_dict(raw.get("agents"))
+    issues = list(inherited_issues)
+    default_permissions = str(raw["default_permissions"]) if "default_permissions" in raw else None
+    if default_permissions is not None and (
+        "sandbox_mode" in raw or "sandbox_workspace_write" in raw
+    ):
+        issues.append(
+            f"{name} combines default_permissions with legacy sandbox settings; official "
+            "configuration says not to combine them."
+        )
+    return CodexRoutingRoute(
+        name=name,
+        kind=kind,
+        sources=sources,
+        model=str(raw["model"]) if "model" in raw else None,
+        reasoning_effort=(
+            str(raw["model_reasoning_effort"]) if "model_reasoning_effort" in raw else None
+        ),
+        approval_policy=_approval_policy(raw),
+        sandbox_mode=str(raw.get("sandbox_mode", SANDBOX_READ_ONLY)),
+        default_permissions=default_permissions,
+        agents_max_threads=_as_int(agents.get("max_threads")),
+        agents_max_depth=_as_int(agents.get("max_depth")),
+        model_provider=str(raw["model_provider"]) if "model_provider" in raw else None,
+        issues=tuple(issues),
+    )
+
+
+def _project_config_path(root: Path, configured_path: str) -> Path:
+    project = Path(configured_path).expanduser()
+    if not project.is_absolute():
+        project = root / project
+    return project / ".codex" / "config.toml"
+
+
+def _routing_routes(root: Path, raw: dict[str, Any]) -> tuple[list[CodexRoutingRoute], list[str]]:
+    """Resolve user, separate profile, and trusted-project persistent routes."""
+    issues: list[str] = []
+    base_issues: list[str] = []
+    if "profile" in raw or "profiles" in raw:
+        base_issues.append(
+            "Legacy profile/profile tables are stale in Codex 0.134.0+; separate "
+            "$CODEX_HOME/<name>.config.toml files are the supported profile surface."
+        )
+
+    profiles: list[tuple[str, dict[str, Any], tuple[str, ...]]] = []
+    try:
+        profile_paths = sorted(root.glob("*.config.toml"))
+    except OSError:
+        profile_paths = []
+        issues.append("Profile files could not be inventoried; profile routing is UNKNOWN.")
+    for path in profile_paths:
+        profile_raw, error = _read_toml_layer(path)
+        profile_issues = (error,) if error else ()
+        profiles.append((path.name.removesuffix(".config.toml"), profile_raw, profile_issues))
+
+    projects: list[tuple[str, dict[str, Any], tuple[str, ...]]] = []
+    for configured_path in _parse_trusted_projects(raw):
+        path = _project_config_path(root, configured_path)
+        project_raw, error = _read_toml_layer(path)
+        if not project_raw and error is None:
+            continue
+        project_issues = (error,) if error else ()
+        projects.append((configured_path, project_raw, project_issues))
+
+    routes = [
+        _route_from_config(
+            name="default",
+            kind="default",
+            sources=("config.toml",),
+            raw=raw,
+            inherited_issues=tuple(base_issues),
+        )
+    ]
+    for name, profile_raw, profile_issues in profiles:
+        routes.append(
+            _route_from_config(
+                name=f"profile:{name}",
+                kind="profile",
+                sources=("config.toml", f"{name}.config.toml"),
+                raw=_merge_layers(raw, profile_raw),
+                inherited_issues=(*base_issues, *profile_issues),
+            )
+        )
+    for project, project_raw, project_issues in projects:
+        project_source = f"{project}/.codex/config.toml"
+        routes.append(
+            _route_from_config(
+                name=f"project:{project}",
+                kind="project",
+                sources=("config.toml", project_source),
+                raw=_merge_layers(raw, project_raw),
+                inherited_issues=(*base_issues, *project_issues),
+            )
+        )
+        for profile_name, profile_raw, profile_issues in profiles:
+            routes.append(
+                _route_from_config(
+                    name=f"profile:{profile_name}+project:{project}",
+                    kind="profile+project",
+                    sources=(
+                        "config.toml",
+                        f"{profile_name}.config.toml",
+                        project_source,
+                    ),
+                    raw=_merge_layers(raw, profile_raw, project_raw),
+                    inherited_issues=(*base_issues, *profile_issues, *project_issues),
+                )
+            )
+    return routes, issues
+
+
 def load_codex_harness(root: Path | str) -> CodexConfig:
     """Parse a Codex harness directory into a :class:`CodexConfig`.
 
@@ -221,12 +410,15 @@ def load_codex_harness(root: Path | str) -> CodexConfig:
         msg = f"No config.toml or AGENTS.md found at {root}"
         raise FileNotFoundError(msg)
 
-    raw = _read_toml(config_path)
+    raw, base_error = _read_toml_layer(config_path)
     sandbox_write = _as_dict(raw.get("sandbox_workspace_write"))
     env_policy = _as_dict(raw.get("shell_environment_policy"))
     history = _as_dict(raw.get("history"))
     agents, max_threads, max_depth = _parse_agents(raw)
 
+    routes, routing_issues = _routing_routes(root, raw)
+    if base_error:
+        routing_issues.append(base_error)
     return CodexConfig(
         root=root,
         harness_type=HARNESS_TYPE_CODEX,
@@ -235,7 +427,7 @@ def load_codex_harness(root: Path | str) -> CodexConfig:
         model_reasoning_effort=(
             str(raw["model_reasoning_effort"]) if "model_reasoning_effort" in raw else None
         ),
-        approval_policy=str(raw.get("approval_policy", "on-request")),
+        approval_policy=_approval_policy(raw),
         sandbox_mode=str(raw.get("sandbox_mode", SANDBOX_READ_ONLY)),
         web_search=str(raw.get("web_search", "off")),
         network_access=_as_bool(sandbox_write.get("network_access")),
@@ -255,6 +447,8 @@ def load_codex_harness(root: Path | str) -> CodexConfig:
         has_agents_md=agents_md.is_file(),
         agent_files=_inventory_codex_agents(root / "agents"),
         raw_config=raw,
+        routing_routes=routes,
+        routing_issues=routing_issues,
     )
 
 

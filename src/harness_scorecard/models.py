@@ -9,7 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import StrEnum
 
-RUBRIC_VERSION = "1.4.0"
+RUBRIC_VERSION = "1.5.0"
 
 
 class Status(StrEnum):
@@ -18,6 +18,7 @@ class Status(StrEnum):
     PASS = "pass"  # noqa: S105 - a check status, not a credential
     PARTIAL = "partial"
     FAIL = "fail"
+    UNKNOWN = "unknown"
     NOT_APPLICABLE = "not_applicable"
 
     @property
@@ -27,6 +28,7 @@ class Status(StrEnum):
             Status.PASS: 1.0,
             Status.PARTIAL: 0.5,
             Status.FAIL: 0.0,
+            Status.UNKNOWN: None,
             Status.NOT_APPLICABLE: None,
         }[self]
 

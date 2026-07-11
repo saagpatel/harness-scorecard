@@ -98,8 +98,7 @@ def _check_stated_guarantees(config: CodexConfig) -> CheckOutcome:
     pending = [f for f in hard if f.status is ClaimStatus.CANDIDATE_LOGIC]
     if not prose_only and not pending:
         return passed(
-            f"All {len(hard)} stated hard guarantees have enforcement backing under "
-            f"{report.mode}.",
+            f"All {len(hard)} stated hard guarantees have enforcement backing under {report.mode}.",
             evidence=[f"{f.claim.source}: {f.status.value}" for f in hard],
         )
     if not backed and prose_only:

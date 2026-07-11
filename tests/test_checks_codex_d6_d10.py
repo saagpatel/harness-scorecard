@@ -61,7 +61,7 @@ class TestD7Subagents(unittest.TestCase):
 
     def test_no_bounds_fails(self) -> None:
         config = make_codex_config(agents_max_threads=None, agents_max_depth=None)
-        self.assertEqual(get_check("CDX-D7-01").run(config).status, Status.FAIL)
+        self.assertEqual(get_check("CDX-D7-01").run(config).status, Status.UNKNOWN)
 
     def test_agent_with_never_bypass_fails(self) -> None:
         config = make_codex_config(agents=[CodexAgent("rogue", "never", None)])
@@ -77,12 +77,13 @@ class TestD7RoutingDiscipline(unittest.TestCase):
         config = make_codex_config(model_reasoning_effort="high")
         self.assertEqual(get_check("CDX-D7-03").run(config).status, Status.PARTIAL)
 
-    def test_xhigh_default_reasoning_fails(self) -> None:
+    def test_xhigh_default_reasoning_is_partial(self) -> None:
         config = make_codex_config(model_reasoning_effort="xhigh")
-        self.assertEqual(get_check("CDX-D7-03").run(config).status, Status.FAIL)
+        self.assertEqual(get_check("CDX-D7-03").run(config).status, Status.PARTIAL)
 
     def test_max_reasoning_in_write_enabled_default_fails_preview_gate(self) -> None:
         config = make_codex_config(
+            model="gpt-5.6-sol",
             model_reasoning_effort="max",
             sandbox_mode="workspace-write",
             agents_max_threads=4,
@@ -91,15 +92,16 @@ class TestD7RoutingDiscipline(unittest.TestCase):
         )
         self.assertEqual(get_check("CDX-D7-04").run(config).status, Status.FAIL)
 
-    def test_max_reasoning_read_only_bounded_passes_preview_gate(self) -> None:
+    def test_max_reasoning_read_only_default_still_needs_profile(self) -> None:
         config = make_codex_config(
+            model="gpt-5.6-sol",
             model_reasoning_effort="max",
             sandbox_mode="read-only",
             agents_max_threads=4,
             agents_max_depth=1,
             agents=[CodexAgent("planner", None, "agents/planner.toml")],
         )
-        self.assertEqual(get_check("CDX-D7-04").run(config).status, Status.PASS)
+        self.assertEqual(get_check("CDX-D7-04").run(config).status, Status.FAIL)
 
     def test_ultra_marker_without_tracked_roles_is_partial(self) -> None:
         config = make_codex_config(
@@ -108,7 +110,7 @@ class TestD7RoutingDiscipline(unittest.TestCase):
             agents_max_depth=1,
             raw_config={"features": {"ultra_mode": True}},
         )
-        self.assertEqual(get_check("CDX-D7-04").run(config).status, Status.PARTIAL)
+        self.assertEqual(get_check("CDX-D7-04").run(config).status, Status.UNKNOWN)
 
 
 class TestD8Recovery(unittest.TestCase):

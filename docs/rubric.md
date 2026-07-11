@@ -1,4 +1,4 @@
-# Harness Scorecard Rubric (v1)
+# Harness Scorecard Rubric (v1.5)
 
 > The rubric **is** the product. It encodes real, documented red-team findings from
 > operating mature coding-agent harnesses into a set of statically-checkable signals,
@@ -81,7 +81,14 @@ Each check returns one of:
 | `PASS` | 1.0 | Guard present and effective |
 | `PARTIAL` | 0.5 | Guard partially present, or present but PARTIAL-detectability |
 | `FAIL` | 0.0 | Guard absent or inert |
+| `UNKNOWN` | — | Material state exists but static evidence cannot resolve it; visible in every output and excluded from the denominator |
 | `NOT_APPLICABLE` | — | Excluded from the denominator (e.g., Codex-only check on a CC harness) |
+
+`UNKNOWN` is not partial credit and not a pass. It is used for unresolved runtime-selected
+models, invocation overrides, stale or unsupported model/effort pairs, contradictory config
+surfaces, and other cases where assigning a numeric value would overstate what static evidence
+proves. JSON emits `"status": "unknown"`; console/HTML/summary render it explicitly; SARIF emits
+an informational `note`. Badges and exit codes continue to reflect the scored grade only.
 
 ### 4.2 Per-check weight
 
@@ -294,6 +301,7 @@ harness runs its own check suite (`HS-*` vs `CDX-*`) over the shared engine.
 | Env hygiene | `config.toml` → `[shell_environment_policy]` | Whether secret-named env vars reach subprocesses |
 | Active guards | `hooks.json` → `SessionStart`/`UserPromptSubmit`/`PreToolUse`/`PermissionRequest`/`PostToolUse`/`Stop` | Lifecycle scripts (same schema as Claude Code) |
 | Delegation | `config.toml` → `[agents]` (`max_threads`, `max_depth`, per-role `approval_policy`, `config_file`) | Subagent fan-out and governance |
+| Model routing | `config.toml`, `$CODEX_HOME/<name>.config.toml`, trusted project `.codex/config.toml` | Effective persistent model/effort/permission routes after user → profile → project precedence |
 | Behavioral contract | `AGENTS.md` / `AGENTS.override.md` | Documented operating rules |
 | History | `config.toml` → `[history].persistence`, `notify` | Audit trail and turn signalling |
 
@@ -303,6 +311,14 @@ combined with `approval_policy = "never"` (no human gate)**. When both hold, des
 exfiltrating actions run unchecked, and the gated checks compute against what remains (hooks
 only). A `[projects."…"].trust_level = "trusted"` likewise lowers the floor by suppressing
 approval inside that directory.
+
+Routing checks resolve only persistent layers that static inspection can read. CLI flags,
+`--config`, `--profile` selection, and in-session `/model` or `/reasoning` changes have higher
+runtime precedence and are therefore disclosed as a caveat rather than guessed. Project config is
+counted only for projects marked trusted; untrusted projects do not activate project `.codex/`
+layers. Separate profile files are supported; stale `[profiles.*]` or top-level `profile` syntax
+is `UNKNOWN`, not credited. `default_permissions` and legacy sandbox keys are also `UNKNOWN` when
+combined, matching the official instruction not to combine those execution-control surfaces.
 
 **Codex gates** (same caps as Claude Code):
 
@@ -375,16 +391,23 @@ approval inside that directory.
 - **CDX-D6-01 — Stop-gate verifies completion (2, STATIC)**: a `Stop` verification hook.
 - **CDX-D6-02 — Independent verification agent (1, STATIC)**: a QA/closeout/review agent role.
 
-**D7 — Subagent governance (weight 3).**
-- **CDX-D7-01 — Fan-out bounded (2, STATIC)**: `max_threads` AND `max_depth` set (one → PARTIAL).
+**D7 — Subagent governance and routing (weight 3).**
+- **CDX-D7-01 — Fan-out bounded (2, STATIC)**: explicit `max_threads` AND `max_depth` pass;
+  one is PARTIAL. Both omitted are UNKNOWN because current official prose describes bounded
+  defaults while the current official config schema says omitted `max_threads` is unlimited.
 - **CDX-D7-02 — No role bypasses approval (1, STATIC)**: no `[agents.*]` runs
   `approval_policy = "never"` (N/A when no roles are declared).
-- **CDX-D7-03 — Default reasoning effort is bounded (1, STATIC)**: the base config stays at
-  low/medium/default reasoning. `high` is PARTIAL because it should normally be an explicit
-  profile; `xhigh`/`max` FAIL because ordinary work inherits the deepest lane.
-- **CDX-D7-04 — Launch-preview delegation is gated (1, PARTIAL)**: launch-preview `max`
-  reasoning or ultra-style config markers must stay out of write-enabled defaults. Read-only,
-  bounded, provenance-tracked profiles can pass; write-enabled defaults fail.
+- **CDX-D7-03 — Persistent reasoning routes are bounded (1, PARTIAL)**: resolves user defaults,
+  separate profile files, trusted-project overrides, and their combinations in documented
+  precedence order. Supported low/medium defaults and explicit high/xhigh profile/project lanes
+  pass; broad high/xhigh defaults are PARTIAL; implicit max/ultra defaults or project overrides
+  FAIL. Runtime-selected, stale, unsupported, or contradictory routes are UNKNOWN.
+- **CDX-D7-04 — Max and Ultra routes have explicit gates (1, PARTIAL)**: max/ultra must live in
+  a separately selected profile. Ultra additionally needs explicit `max_threads`/`max_depth` and
+  either read-only execution or a live approval gate. Guessed non-schema ultra markers are
+  UNKNOWN; the check is N/A when no max/ultra route exists, so absence earns no vacuous credit.
+  The vulnerable/guarded score effect is proven by
+  [`examples/redteam/codex-d7-routing`](../examples/redteam/codex-d7-routing/ATTACK.md).
 
 **D8 — Recovery (weight 2).** Codex has no PreCompact analog; the checks credit what its
 surface offers.
