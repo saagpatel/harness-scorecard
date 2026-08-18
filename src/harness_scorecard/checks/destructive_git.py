@@ -60,7 +60,10 @@ def _check_catastrophic_deletion(config: HarnessConfig) -> CheckOutcome:
 def _check_destructive_db(config: HarnessConfig) -> CheckOutcome:
     floor = effective_block(
         config,
-        hooks=("db-guard", "database-guard"),
+        # ``core-guard`` is a consolidated PreToolUse Bash guard whose ``remote-db-destructive``
+        # rule blocks DROP/TRUNCATE/DELETE FROM/FLUSHALL against a non-local host -- credited by
+        # registration on the Bash lane, the same effective-floor basis as a named ``db-guard``.
+        hooks=("db-guard", "database-guard", "core-guard"),
         deny_needles=(),
         hard_deny_tokens=(("destructive", "db"), ("database",), ("db", "host")),
     )
@@ -81,8 +84,15 @@ def _check_dependency_install_gate(config: HarnessConfig) -> CheckOutcome:
 
 
 def _check_force_push_policy(config: HarnessConfig) -> CheckOutcome:
-    if config.has_hook("PreToolUse", "git-safety", matcher="Bash"):
-        return passed("A git-safety hook covers force-push / history-rewrite.")
+    # ``git-safety`` is the dedicated guard; ``core-guard``'s ``history-destruction`` rule
+    # blocks force / force-with-lease / mirror pushes and filter-branch/filter-repo, so a
+    # harness that consolidated its git guard into core-guard is equally covered.
+    for hook_name in ("git-safety", "core-guard"):
+        if config.has_hook("PreToolUse", hook_name, matcher="Bash"):
+            return passed(
+                f"Force-push / history-rewrite is blocked by the {hook_name} hook.",
+                evidence=[f"hook:{hook_name}"],
+            )
     if any(("force" in rule.lower() or "git-safety" in rule.lower()) for rule in config.rule_files):
         return partial(
             "Force-push policy is documented in rules/ but not enforced by a hook.",

@@ -106,5 +106,37 @@ class TestD4OnFixtures(unittest.TestCase):
         self.assertEqual(result.triggered_gate_cap.value, "C")
 
 
+class TestD4CoreGuardRecognition(unittest.TestCase):
+    """A consolidated ``core-guard`` hook is credited for the rules it actually enforces."""
+
+    def _core_guard_config(self, **overrides) -> HarnessConfig:
+        return make_config(
+            default_mode="bypassPermissions",
+            hooks=[HookEntry("PreToolUse", "Bash", "python3 /h/core-guard.py")],
+            **overrides,
+        )
+
+    def test_core_guard_credits_destructive_db(self):
+        result = get_check("HS-D4-03").run(self._core_guard_config())
+        self.assertEqual(result.status, Status.PASS)
+        self.assertIn("hook:core-guard", result.evidence)
+
+    def test_core_guard_credits_force_push(self):
+        result = get_check("HS-D4-05").run(self._core_guard_config())
+        self.assertEqual(result.status, Status.PASS)
+        self.assertIn("hook:core-guard", result.evidence)
+
+    def test_core_guard_does_not_credit_push_to_main(self):
+        # core-guard deliberately does NOT block push to a protected branch (that became a
+        # behavioral rule), so its presence must not paper over the missing D4-01 guard.
+        result = get_check("HS-D4-01").run(self._core_guard_config())
+        self.assertEqual(result.status, Status.FAIL)
+        self.assertEqual(result.triggered_gate_cap.value, "C")
+
+    def test_no_core_guard_still_fails_destructive_db(self):
+        result = get_check("HS-D4-03").run(make_config(default_mode="bypassPermissions"))
+        self.assertEqual(result.status, Status.FAIL)
+
+
 if __name__ == "__main__":
     unittest.main()
