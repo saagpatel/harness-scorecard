@@ -8,6 +8,9 @@ Official Responses API contract (OpenAI prompt-caching guide, inspected 2026-09-
   (``input_text``, ``input_image``, ``input_file``) inside an ``input`` message.
 - Explicit-only mode writes cache only at those breakpoints; content after the last
   breakpoint is ordinary uncached input with no cache-write charge.
+- A later user/tool/assistant message may use plain-string ``content`` as a volatile
+  suffix. Breakpoints still cannot live on that string; only breakpoint-bearing
+  malformed structures are treated as unresolved.
 
 This module reads those fields from TOML. It does not claim Codex serializes them at
 runtime: the official Codex config schema currently omits them, so a later check may
@@ -53,6 +56,7 @@ class CodexCacheBlock:
     content_type: str | None
     has_breakpoint: bool
     breakpoint_mode: str | None
+    plain_string: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -136,22 +140,45 @@ def _parse_content_item(
     )
 
 
+def _parse_plain_string_message(
+    role: str | None, message: dict[str, Any], issues: list[str]
+) -> list[CodexCacheBlock]:
+    """Plain-string content is a valid volatile suffix after an explicit breakpoint.
+
+    Official GPT-5.6 explicit caching places the breakpoint on a developer content-block
+    list, then lets later user/tool/assistant messages use a string. A breakpoint on
+    that string is malformed; the string itself is not.
+    """
+    role_kind = (role or "").strip().lower()
+    if "prompt_cache_breakpoint" in message:
+        issues.append("prompt_cache_breakpoint cannot be attached to plain-string content")
+        return []
+    if role_kind not in STABLE_ROLES and role_kind not in VOLATILE_ROLES:
+        issues.append("plain-string content has no classifiable role as policy vs project state")
+        return []
+    return [
+        CodexCacheBlock(
+            role=role,
+            content_type=None,
+            has_breakpoint=False,
+            breakpoint_mode=None,
+            plain_string=True,
+        )
+    ]
+
+
 def _parse_message(message: Any, issues: list[str]) -> list[CodexCacheBlock]:
     if not isinstance(message, dict):
         issues.append("input item is not a message object")
         return []
+    role = _as_str(message.get("role"))
+    content = message.get("content")
+    if isinstance(content, str):
+        return _parse_plain_string_message(role, message, issues)
     if "prompt_cache_breakpoint" in message:
         issues.append(
             "prompt_cache_breakpoint must live on a supported content block, not the message"
         )
-    role = _as_str(message.get("role"))
-    content = message.get("content")
-    if isinstance(content, str):
-        issues.append(
-            "string content is not the GPT-5.6 Responses content-block shape; "
-            "use input_text / input_image / input_file blocks"
-        )
-        return []
     if isinstance(content, list):
         blocks: list[CodexCacheBlock] = []
         for item in content:

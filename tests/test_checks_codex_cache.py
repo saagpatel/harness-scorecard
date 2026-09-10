@@ -76,6 +76,50 @@ class TestCacheDeclarationParser(unittest.TestCase):
         self.assertEqual(parsed.unofficial_markers, ())
         self.assertEqual(parsed.issues, ())
 
+    def test_plain_string_user_suffix_is_volatile_not_malformed(self) -> None:
+        parsed = parse_cache_declaration(
+            {
+                "prompt_cache_options": {"mode": "explicit"},
+                "input": [
+                    {
+                        "role": "developer",
+                        "content": [
+                            {
+                                "type": "input_text",
+                                "text": "Stable policy",
+                                "prompt_cache_breakpoint": {"mode": "explicit"},
+                            }
+                        ],
+                    },
+                    {"role": "user", "content": "Dynamic project state"},
+                ],
+            }
+        )
+        self.assertEqual(parsed.issues, ())
+        self.assertEqual(len(parsed.blocks), 2)
+        self.assertTrue(parsed.blocks[0].has_breakpoint)
+        self.assertTrue(parsed.blocks[1].plain_string)
+        self.assertEqual(parsed.blocks[1].role, "user")
+        self.assertFalse(parsed.blocks[1].has_breakpoint)
+
+    def test_breakpoint_on_plain_string_is_malformed(self) -> None:
+        parsed = parse_cache_declaration(
+            {
+                "prompt_cache_options": {"mode": "explicit"},
+                "input": [
+                    {
+                        "role": "user",
+                        "content": "Dynamic project state",
+                        "prompt_cache_breakpoint": {"mode": "explicit"},
+                    }
+                ],
+            }
+        )
+        self.assertTrue(
+            any("plain-string" in issue for issue in parsed.issues),
+            parsed.issues,
+        )
+
     def test_unofficial_markers_and_malformed_options(self) -> None:
         parsed = parse_cache_declaration(
             {
@@ -93,11 +137,17 @@ class TestCacheBreakpointFixtures(unittest.TestCase):
     def test_explicit_stable_first_passes(self) -> None:
         self.assertEqual(_status("explicit_stable_first"), Status.PASS)
 
+    def test_explicit_string_user_suffix_passes(self) -> None:
+        self.assertEqual(_status("explicit_string_user_suffix"), Status.PASS)
+
     def test_implicit_mode_fails(self) -> None:
         self.assertEqual(_status("implicit_hides_writes"), Status.FAIL)
 
     def test_volatile_before_policy_fails(self) -> None:
         self.assertEqual(_status("volatile_before_policy"), Status.FAIL)
+
+    def test_string_user_before_breakpoint_fails(self) -> None:
+        self.assertEqual(_status("string_user_before_breakpoint"), Status.FAIL)
 
     def test_runtime_only_is_unknown(self) -> None:
         self.assertEqual(_status("runtime_only"), Status.UNKNOWN)
@@ -175,6 +225,77 @@ class TestCacheBreakpointUnitCases(unittest.TestCase):
         self.assertEqual(result.status, Status.FAIL)
         self.assertIn("volatile", result.message.lower())
 
+    def test_developer_list_then_plain_string_user_passes(self) -> None:
+        config = make_codex_config(
+            model="gpt-5.6-sol",
+            raw_config={
+                "prompt_cache_options": {"mode": "explicit"},
+                "input": [
+                    {
+                        "role": "developer",
+                        "content": [
+                            {
+                                "type": "input_text",
+                                "text": "Stable policy",
+                                "prompt_cache_breakpoint": {"mode": "explicit"},
+                            }
+                        ],
+                    },
+                    {"role": "user", "content": "Dynamic project state"},
+                ],
+            },
+        )
+        result = get_check("CDX-D7-05").run(config)
+        self.assertEqual(result.status, Status.PASS)
+
+    def test_tool_and_assistant_plain_string_suffixes_pass(self) -> None:
+        for role in ("tool", "assistant"):
+            with self.subTest(role=role):
+                config = make_codex_config(
+                    model="gpt-5.6-sol",
+                    raw_config={
+                        "prompt_cache_options": {"mode": "explicit"},
+                        "input": [
+                            {
+                                "role": "developer",
+                                "content": [
+                                    {
+                                        "type": "input_text",
+                                        "text": "Stable policy",
+                                        "prompt_cache_breakpoint": {"mode": "explicit"},
+                                    }
+                                ],
+                            },
+                            {"role": role, "content": "Dynamic project state"},
+                        ],
+                    },
+                )
+                self.assertEqual(get_check("CDX-D7-05").run(config).status, Status.PASS)
+
+    def test_plain_string_user_before_breakpoint_fails(self) -> None:
+        config = make_codex_config(
+            model="gpt-5.6-sol",
+            raw_config={
+                "prompt_cache_options": {"mode": "explicit"},
+                "input": [
+                    {"role": "user", "content": "Dynamic project state"},
+                    {
+                        "role": "developer",
+                        "content": [
+                            {
+                                "type": "input_text",
+                                "text": "Stable policy",
+                                "prompt_cache_breakpoint": {"mode": "explicit"},
+                            }
+                        ],
+                    },
+                ],
+            },
+        )
+        result = get_check("CDX-D7-05").run(config)
+        self.assertEqual(result.status, Status.FAIL)
+        self.assertIn("volatile", result.message.lower())
+
     def test_discovery_attaches_cache_to_persistent_routes(self) -> None:
         config = load_codex_harness(FIXTURES / "explicit_stable_first")
         self.assertEqual(len(config.routing_routes), 1)
@@ -241,9 +362,48 @@ class TestCacheCheckRenderersAndDiff(unittest.TestCase):
         self.assertIn("CDX-D7-05", render_html(card))
         self.assertIn("**`CDX-D7-05`** · FAIL", render_github_summary(card))
 
+    def test_string_suffix_pass_appears_in_every_renderer(self) -> None:
+        card = _score(FIXTURES / "explicit_string_user_suffix")
+        self.assertEqual(_check(card, "CDX-D7-05").status, Status.PASS)
+        self.assertIn("[PASS] CDX-D7-05", render_console(card))
+        payload = to_dict(card)
+        check = next(
+            item
+            for dim in payload["dimensions"]
+            if dim["id"] == "D7"
+            for item in dim["checks"]
+            if item["id"] == "CDX-D7-05"
+        )
+        self.assertEqual(check["status"], "pass")
+        html = render_html(card)
+        self.assertIn("CDX-D7-05", html)
+        self.assertIn("PASS", html)
+        summary = render_github_summary(card)
+        self.assertNotIn("**`CDX-D7-05`** · FAIL", summary)
+        self.assertNotIn("**`CDX-D7-05`** · UNKNOWN", summary)
+        sarif = to_sarif(card)
+        rule_ids = [rule["id"] for rule in sarif["runs"][0]["tool"]["driver"]["rules"]]
+        self.assertIn("CDX-D7-05", rule_ids)
+        results = [item for item in sarif["runs"][0]["results"] if item["ruleId"] == "CDX-D7-05"]
+        self.assertEqual(results, [])
+
     def test_diff_captures_pass_to_fail(self) -> None:
         old = _score(FIXTURES / "explicit_stable_first")
         new = _score(FIXTURES / "implicit_hides_writes")
+        diff = diff_scorecards(old, new)
+        cache_delta = next(item for item in diff.check_deltas if item.id == "CDX-D7-05")
+        self.assertEqual(cache_delta.old_status, Status.PASS)
+        self.assertEqual(cache_delta.new_status, Status.FAIL)
+        text = render_diff_console(diff)
+        payload = json.loads(render_diff_json(diff))
+        self.assertIn("CDX-D7-05", text)
+        self.assertIn("PASS -> FAIL", text)
+        changed = [item["id"] for item in payload["checks_changed"]]
+        self.assertIn("CDX-D7-05", changed)
+
+    def test_diff_string_suffix_pass_to_before_breakpoint_fail(self) -> None:
+        old = _score(FIXTURES / "explicit_string_user_suffix")
+        new = _score(FIXTURES / "string_user_before_breakpoint")
         diff = diff_scorecards(old, new)
         cache_delta = next(item for item in diff.check_deltas if item.id == "CDX-D7-05")
         self.assertEqual(cache_delta.old_status, Status.PASS)

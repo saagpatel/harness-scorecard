@@ -67,7 +67,7 @@ def _routes(config: CodexConfig) -> list[CodexRoutingRoute]:
 
 def _block_evidence(block: CodexCacheBlock) -> str:
     role = block.role or "untyped-role"
-    content_type = block.content_type or "untyped-block"
+    content_type = block.content_type or ("text" if block.plain_string else "untyped-block")
     if block.has_breakpoint:
         return f"{role}/{content_type} breakpoint={block.breakpoint_mode or 'missing'}"
     return f"{role}/{content_type}"
@@ -111,12 +111,22 @@ def _kind(block: CodexCacheBlock) -> str | None:
     return None
 
 
+def _plain_string_issue(block: CodexCacheBlock) -> str | None:
+    if block.has_breakpoint:
+        return "prompt_cache_breakpoint cannot be attached to plain-string content"
+    if _kind(block) is None or not block.role:
+        return "content block role or type cannot be classified as policy vs project state"
+    return None
+
+
 def _unresolved_block_issue(block: CodexCacheBlock) -> str | None:
     if block.has_breakpoint and block.breakpoint_mode != BREAKPOINT_MODE:
         return (
             f"prompt_cache_breakpoint.mode={block.breakpoint_mode!r} is not the documented "
             f"{BREAKPOINT_MODE!r} value"
         )
+    if block.plain_string:
+        return _plain_string_issue(block)
     if block.has_breakpoint and block.content_type not in SUPPORTED_CONTENT_TYPES:
         return (
             f"prompt_cache_breakpoint on {block.content_type!r} is not a supported GPT-5.6 "
