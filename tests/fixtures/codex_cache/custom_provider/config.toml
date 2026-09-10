@@ -1,0 +1,19 @@
+model = "gpt-5.6-sol"
+model_provider = "local"
+model_reasoning_effort = "medium"
+approval_policy = "on-request"
+sandbox_mode = "workspace-write"
+
+[prompt_cache_options]
+mode = "explicit"
+ttl = "30m"
+
+[[input]]
+role = "developer"
+content = [
+  { type = "input_text", text = "Stable policy and rubric context.", prompt_cache_breakpoint = { mode = "explicit" } },
+]
+
+[model_providers.local]
+name = "Local"
+base_url = "http://127.0.0.1:8000/v1"

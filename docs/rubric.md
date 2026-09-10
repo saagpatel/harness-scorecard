@@ -1,4 +1,4 @@
-# Harness Scorecard Rubric (v1.5)
+# Harness Scorecard Rubric (v1.6)
 
 > The rubric **is** the product. It encodes real, documented red-team findings from
 > operating mature coding-agent harnesses into a set of statically-checkable signals,
@@ -302,6 +302,7 @@ harness runs its own check suite (`HS-*` vs `CDX-*`) over the shared engine.
 | Active guards | `hooks.json` → `SessionStart`/`UserPromptSubmit`/`PreToolUse`/`PermissionRequest`/`PostToolUse`/`Stop` | Lifecycle scripts (same schema as Claude Code) |
 | Delegation | `config.toml` → `[agents]` (`max_threads`, `max_depth`, per-role `approval_policy`, `config_file`) | Subagent fan-out and governance |
 | Model routing | `config.toml`, `$CODEX_HOME/<name>.config.toml`, trusted project `.codex/config.toml` | Effective persistent model/effort/permission routes after user → profile → project precedence |
+| Prompt cache | `config.toml` → `prompt_cache_options`, `input[].content[].prompt_cache_breakpoint` | Declared GPT-5.6 explicit cache-write boundary (syntax only; not runtime cache hits) |
 | Behavioral contract | `AGENTS.md` / `AGENTS.override.md` | Documented operating rules |
 | History | `config.toml` → `[history].persistence`, `notify` | Audit trail and turn signalling |
 
@@ -408,6 +409,14 @@ combined, matching the official instruction not to combine those execution-contr
   UNKNOWN; the check is N/A when no max/ultra route exists, so absence earns no vacuous credit.
   The vulnerable/guarded score effect is proven by
   [`examples/redteam/codex-d7-routing`](../examples/redteam/codex-d7-routing/ATTACK.md).
+- **CDX-D7-05 — GPT-5.6 cache-breakpoint hygiene (1, PARTIAL)**: inspects persistent
+  `prompt_cache_options` / `prompt_cache_breakpoint` syntax only. PASS requires
+  `mode = "explicit"` and a breakpoint on the last stable developer content block before
+  volatile project/user state, so cache-write cost is accounted. Implicit mode or a prefix
+  that includes project state FAILs. Unsupported markers, custom providers, runtime-selected
+  models, omitted input blocks, and GPT-5.6 routes with no declared syntax are UNKNOWN.
+  Earlier models with no cache fields are N/A. The check does not claim runtime cache hits;
+  UNKNOWN is excluded from the D7 denominator, so existing routing scores are unchanged.
 
 **D8 — Recovery (weight 2).** Codex has no PreCompact analog; the checks credit what its
 surface offers.
@@ -446,4 +455,4 @@ missing, never the secret values a guard protects. Nothing leaves the machine.
 
 The rubric is versioned (`RUBRIC_VERSION`) and emitted in every report so a grade is
 reproducible against a known rubric. Adding/retiring checks bumps the version. Current
-rubric: **1.3.0**. Check IDs (`HS-Dn-nn` / `CDX-Dn-nn`) are stable and never reused.
+rubric: **1.6.0**. Check IDs (`HS-Dn-nn` / `CDX-Dn-nn`) are stable and never reused.
