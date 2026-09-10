@@ -185,7 +185,7 @@ class TestCacheDeclarationParser(unittest.TestCase):
         self.assertTrue(
             any("undocumented fields: retention" in issue for issue in parsed.issues),
             parsed.issues,
-        ))
+        )
 
 
 class TestCacheBreakpointFixtures(unittest.TestCase):
