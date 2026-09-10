@@ -3,3 +3,4 @@
 Sentinel: MOBILE-CLOUD-A
 
 Purpose: verify phone → Grokbot → Cursor Cloud → GitHub with the primary Mac powered off.
+Follow-up sentinel: MOBILE-CLOUD-B
