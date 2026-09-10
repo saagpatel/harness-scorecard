@@ -413,10 +413,12 @@ combined, matching the official instruction not to combine those execution-contr
   `prompt_cache_options` / `prompt_cache_breakpoint` syntax only. PASS requires
   `mode = "explicit"` and a breakpoint on the last stable developer content block before
   volatile project/user state, so cache-write cost is accounted. A later user/tool/assistant
-  message may use plain-string `content` as that volatile suffix. Implicit mode or a prefix
-  that includes project state FAILs. Unsupported markers, custom providers, runtime-selected
-  models, omitted input blocks, malformed breakpoint-bearing structures, and GPT-5.6 routes
-  with no declared syntax are UNKNOWN.
+  message may use plain-string `content` as that volatile suffix. Official
+  `prompt_cache_options.comparison_response_id` is an optional string diagnostic field and
+  does not change hygiene when well-typed; a non-string value is UNKNOWN. Implicit mode or a
+  prefix that includes project state FAILs. Unsupported markers, custom providers,
+  runtime-selected models, omitted input blocks, malformed breakpoint-bearing structures,
+  undocumented options fields, and GPT-5.6 routes with no declared syntax are UNKNOWN.
   Earlier models with no cache fields are N/A. The check does not claim runtime cache hits;
   UNKNOWN is excluded from the D7 denominator, so existing routing scores are unchanged.
 

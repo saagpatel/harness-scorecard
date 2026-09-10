@@ -44,6 +44,28 @@ def _check(card, check_id: str):
     raise AssertionError(msg)
 
 
+_EXPLICIT_DEVELOPER_BREAKPOINT = {
+    "type": "input_text",
+    "text": "Stable policy",
+    "prompt_cache_breakpoint": {"mode": "explicit"},
+}
+
+
+def _explicit_then_string_user(
+    extra_options: dict[str, object] | None = None,
+) -> dict[str, object]:
+    options = {"mode": "explicit"}
+    if extra_options:
+        options.update(extra_options)
+    return {
+        "prompt_cache_options": options,
+        "input": [
+            {"role": "developer", "content": [_EXPLICIT_DEVELOPER_BREAKPOINT]},
+            {"role": "user", "content": "Dynamic project state"},
+        ],
+    }
+
+
 class TestCacheDeclarationParser(unittest.TestCase):
     def test_official_explicit_prefix(self) -> None:
         parsed = parse_cache_declaration(
@@ -131,6 +153,39 @@ class TestCacheDeclarationParser(unittest.TestCase):
         self.assertIn("cache_control", parsed.unofficial_markers)
         self.assertIn("prompt_cache_retention", parsed.unofficial_markers)
         self.assertTrue(any("not a table" in issue for issue in parsed.issues))
+
+    def test_comparison_response_id_string_is_official(self) -> None:
+        parsed = parse_cache_declaration(
+            _explicit_then_string_user({"comparison_response_id": "resp_abc123", "ttl": "30m"})
+        )
+        self.assertEqual(parsed.issues, ())
+        self.assertEqual(parsed.comparison_response_id, "resp_abc123")
+        self.assertEqual(parsed.mode, "explicit")
+        self.assertTrue(parsed.blocks[1].plain_string)
+
+    def test_comparison_response_id_non_string_is_malformed(self) -> None:
+        for value in (123, True, ["resp_abc123"], {"id": "resp_abc123"}):
+            with self.subTest(value=value):
+                parsed = parse_cache_declaration(
+                    {"prompt_cache_options": {"mode": "explicit", "comparison_response_id": value}}
+                )
+                self.assertTrue(
+                    any(
+                        "comparison_response_id" in issue and "not a string" in issue
+                        for issue in parsed.issues
+                    ),
+                    parsed.issues,
+                )
+                self.assertIsNone(parsed.comparison_response_id)
+
+    def test_undocumented_prompt_cache_options_field_remains_unresolved(self) -> None:
+        parsed = parse_cache_declaration(
+            {"prompt_cache_options": {"mode": "explicit", "retention": "24h"}}
+        )
+        self.assertTrue(
+            any("undocumented fields: retention" in issue for issue in parsed.issues),
+            parsed.issues,
+        ))
 
 
 class TestCacheBreakpointFixtures(unittest.TestCase):
@@ -271,6 +326,32 @@ class TestCacheBreakpointUnitCases(unittest.TestCase):
                     },
                 )
                 self.assertEqual(get_check("CDX-D7-05").run(config).status, Status.PASS)
+
+    def test_comparison_response_id_string_preserves_plain_string_suffix_pass(self) -> None:
+        config = make_codex_config(
+            model="gpt-5.6-sol",
+            raw_config=_explicit_then_string_user({"comparison_response_id": "resp_abc123"}),
+        )
+        result = get_check("CDX-D7-05").run(config)
+        self.assertEqual(result.status, Status.PASS)
+
+    def test_comparison_response_id_invalid_type_is_unknown(self) -> None:
+        config = make_codex_config(
+            model="gpt-5.6-sol",
+            raw_config=_explicit_then_string_user({"comparison_response_id": 123}),
+        )
+        result = get_check("CDX-D7-05").run(config)
+        self.assertEqual(result.status, Status.UNKNOWN)
+        self.assertIn("malformed", result.message.lower())
+
+    def test_undocumented_prompt_cache_options_field_is_unknown(self) -> None:
+        config = make_codex_config(
+            model="gpt-5.6-sol",
+            raw_config=_explicit_then_string_user({"retention": "24h"}),
+        )
+        result = get_check("CDX-D7-05").run(config)
+        self.assertEqual(result.status, Status.UNKNOWN)
+        self.assertIn("malformed", result.message.lower())
 
     def test_plain_string_user_before_breakpoint_fails(self) -> None:
         config = make_codex_config(
