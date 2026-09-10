@@ -1,0 +1,4 @@
+{
+  "disableAllMcpServers": true,
+  "install": "uv sync --frozen && uv run --no-sync python -m unittest discover -s tests"
+}
