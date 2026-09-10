@@ -412,9 +412,11 @@ combined, matching the official instruction not to combine those execution-contr
 - **CDX-D7-05 — GPT-5.6 cache-breakpoint hygiene (1, PARTIAL)**: inspects persistent
   `prompt_cache_options` / `prompt_cache_breakpoint` syntax only. PASS requires
   `mode = "explicit"` and a breakpoint on the last stable developer content block before
-  volatile project/user state, so cache-write cost is accounted. Implicit mode or a prefix
+  volatile project/user state, so cache-write cost is accounted. A later user/tool/assistant
+  message may use plain-string `content` as that volatile suffix. Implicit mode or a prefix
   that includes project state FAILs. Unsupported markers, custom providers, runtime-selected
-  models, omitted input blocks, and GPT-5.6 routes with no declared syntax are UNKNOWN.
+  models, omitted input blocks, malformed breakpoint-bearing structures, and GPT-5.6 routes
+  with no declared syntax are UNKNOWN.
   Earlier models with no cache fields are N/A. The check does not claim runtime cache hits;
   UNKNOWN is excluded from the D7 denominator, so existing routing scores are unchanged.
 

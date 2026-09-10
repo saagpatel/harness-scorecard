@@ -13,11 +13,20 @@ All notable changes to Harness Scorecard are documented here. The format follows
   `prompt_cache_options.ttl` (`30m`), and content-block `prompt_cache_breakpoint: { mode =
   "explicit" }` on `input_text` / `input_image` / `input_file`. PASS requires explicit
   cache-write accounting and stable developer/policy context before volatile project/user
-  state. Implicit writes, unofficial `cache_control` / `prompt_cache_retention` markers,
-  custom providers, runtime-selected models, and omitted syntax are UNKNOWN (or FAIL when
-  the declared official syntax hides writes or inverts prefix order). The check does not
-  claim runtime cache hits. Rubric 1.6.0; existing D7 scores stay unchanged because UNKNOWN
-  and N/A are excluded from the denominator.
+  state. A later user/tool/assistant message may use plain-string `content` as that
+  volatile suffix. Implicit writes, unofficial `cache_control` / `prompt_cache_retention`
+  markers, custom providers, runtime-selected models, malformed breakpoint-bearing
+  structures, and omitted syntax are UNKNOWN (or FAIL when the declared official syntax
+  hides writes or inverts prefix order). The check does not claim runtime cache hits.
+  Rubric 1.6.0; existing D7 scores stay unchanged because UNKNOWN and N/A are excluded
+  from the denominator.
+
+### Fixed
+
+- **`CDX-D7-05` accepts official plain-string volatile suffixes.** A developer
+  content-block list with `prompt_cache_breakpoint` followed by `{role: user, content:
+  "<string>"}` (or tool/assistant) is PASS, not UNKNOWN. Only breakpoint-bearing
+  malformed structures stay unresolved.
 - **GPT-5.6 Codex routing discipline.** `CDX-D7-03` now resolves effective persistent routes
   across user config, separate profiles, and trusted-project overrides. `CDX-D7-04` requires
   Max/Ultra to use an explicit profile, with Ultra fan-out and execution gates. Verified Sol,
