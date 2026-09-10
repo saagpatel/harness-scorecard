@@ -15,12 +15,13 @@ red-team rubric. This is the candidate backlog beyond 1.0 — ordered by leverag
   compatibility, explicit Max/Ultra gates, UNKNOWN semantics, and red-team score calibration now
   land through `CDX-D7-03` / `CDX-D7-04`. A separate read-only maintainer monitor reports official
   schema or installed model-catalog drift without changing the static grade.
+- **Cache-breakpoint hygiene** — `CDX-D7-05` grades declared GPT-5.6
+  `prompt_cache_options` / `prompt_cache_breakpoint` syntax on persistent Codex config.
+  Stable policy/rubric context must precede volatile project state, and cache-write cost must
+  be explicit. Unsupported, runtime-only, and ambiguous cases are UNKNOWN and stay out of
+  the score.
 
 ## Near-term
-
-- **Cache-breakpoint hygiene** — once GPT-5.6 cache breakpoint syntax is official, check that
-  stable policy/rubric context comes before volatile project state and that cache-write cost is
-  not silently hidden.
 
 ## Mid-term (1.x)
 

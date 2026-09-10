@@ -263,6 +263,12 @@ FAILURE_MODES: dict[str, str] = {
         "explicit fan-out and execution gates. A guessed ultra marker can also look disciplined "
         "to a text scanner while being inert configuration."
     ),
+    "CDX-D7-05": (
+        "GPT-5.6 cache writes charge 1.25x ordinary input. Implicit or undeclared breakpoints "
+        "write through volatile project state, or a breakpoint is placed before stable "
+        "policy/rubric context, so cache-write cost is hidden and the reusable prefix is the "
+        "wrong slice. Static inspection cannot prove runtime hits."
+    ),
     # D8 — Recovery
     "CDX-D8-01": (
         "Changes are not confined for rollback, because sandbox_mode = danger-full-access lets "

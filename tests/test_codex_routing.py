@@ -82,6 +82,15 @@ class TestRoutingRedTeamPair(unittest.TestCase):
         self.assertEqual(_dimension_score(vulnerable, "D7"), 0.5)
         self.assertEqual(_dimension_score(guarded, "D7"), 1.0)
         self.assertGreater(guarded.overall_score, vulnerable.overall_score)
+        cache_id = "CDX-D7-05"
+        self.assertEqual(
+            next(c.status for d in vulnerable.dimensions for c in d.checks if c.id == cache_id),
+            Status.UNKNOWN,
+        )
+        self.assertEqual(
+            next(c.status for d in guarded.dimensions for c in d.checks if c.id == cache_id),
+            Status.UNKNOWN,
+        )
 
 
 if __name__ == "__main__":

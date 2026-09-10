@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import Any
 
 from harness_scorecard.caveats import detect_dispatcher_caveats
+from harness_scorecard.codex_cache import CodexCacheDeclaration, parse_cache_declaration
 from harness_scorecard.parsing import (
     HookEntry,
     event_present,
@@ -78,6 +79,7 @@ class CodexRoutingRoute:
     agents_max_depth: int | None
     model_provider: str | None = None
     issues: tuple[str, ...] = ()
+    cache: CodexCacheDeclaration = field(default_factory=CodexCacheDeclaration)
 
     @property
     def write_enabled(self) -> bool | None:
@@ -310,6 +312,7 @@ def _route_from_config(
         agents_max_depth=_as_int(agents.get("max_depth")),
         model_provider=str(raw["model_provider"]) if "model_provider" in raw else None,
         issues=tuple(issues),
+        cache=parse_cache_declaration(raw),
     )
 
 
