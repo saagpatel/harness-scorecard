@@ -10,7 +10,9 @@ All notable changes to Harness Scorecard are documented here. The format follows
 
 - **GPT-5.6 cache-breakpoint hygiene.** `CDX-D7-05` inspects persistent Codex configuration
   for the official Responses API fields `prompt_cache_options.mode` (`explicit`/`implicit`),
-  `prompt_cache_options.ttl` (`30m`), and content-block `prompt_cache_breakpoint: { mode =
+  `prompt_cache_options.ttl` (`30m`), optional string
+  `prompt_cache_options.comparison_response_id` (diagnostics only; ignored for hygiene
+  when well-typed), and content-block `prompt_cache_breakpoint: { mode =
   "explicit" }` on `input_text` / `input_image` / `input_file`. PASS requires explicit
   cache-write accounting and stable developer/policy context before volatile project/user
   state. A later user/tool/assistant message may use plain-string `content` as that
@@ -23,6 +25,10 @@ All notable changes to Harness Scorecard are documented here. The format follows
 
 ### Fixed
 
+- **`CDX-D7-05` accepts official `prompt_cache_options.comparison_response_id`.** A
+  string diagnostic baseline is documented on Responses `PromptCacheOptions` and does
+  not change cache-write hygiene. A non-string value, or any other extra options
+  field, remains UNKNOWN. This does not claim Codex serializes the field at runtime.
 - **`CDX-D7-05` accepts official plain-string volatile suffixes.** A developer
   content-block list with `prompt_cache_breakpoint` followed by `{role: user, content:
   "<string>"}` (or tool/assistant) is PASS, not UNKNOWN. Only breakpoint-bearing

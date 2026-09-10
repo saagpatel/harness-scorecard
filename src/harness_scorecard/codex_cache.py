@@ -1,9 +1,13 @@
 """Parse declared GPT-5.6 prompt-cache syntax from persistent Codex configuration.
 
-Official Responses API contract (OpenAI prompt-caching guide, inspected 2026-09-10):
+Official Responses API contract (OpenAI prompt-caching guide and Responses
+``PromptCacheOptions`` schema, inspected 2026-09-10):
 
 - ``prompt_cache_options.mode`` is ``explicit`` or ``implicit``.
 - ``prompt_cache_options.ttl`` is ``30m`` when set.
+- ``prompt_cache_options.comparison_response_id`` is an optional string diagnostic
+  baseline. It does not change cache-write hygiene; a well-typed value is ignored
+  for the PASS/FAIL prefix check, while a non-string value is unresolved.
 - ``prompt_cache_breakpoint: { "mode": "explicit" }`` marks a supported content block
   (``input_text``, ``input_image``, ``input_file``) inside an ``input`` message.
 - Explicit-only mode writes cache only at those breakpoints; content after the last
@@ -27,6 +31,7 @@ SUPPORTED_CONTENT_TYPES = frozenset({"input_text", "input_image", "input_file"})
 STABLE_ROLES = frozenset({"developer"})
 VOLATILE_ROLES = frozenset({"user", "tool", "assistant"})
 OPTIONS_MODES = frozenset({"explicit", "implicit"})
+OPTIONS_FIELDS = frozenset({"mode", "ttl", "comparison_response_id"})
 BREAKPOINT_MODE = "explicit"
 TTL_30M = "30m"
 MAX_CACHE_WRITES = 4
@@ -65,6 +70,7 @@ class CodexCacheDeclaration:
 
     mode: str | None = None
     ttl: str | None = None
+    comparison_response_id: str | None = None
     key_set: bool = False
     options_present: bool = False
     blocks: tuple[CodexCacheBlock, ...] = ()
@@ -193,25 +199,31 @@ def _parse_message(message: Any, issues: list[str]) -> list[CodexCacheBlock]:
     return []
 
 
-def _parse_options(raw: dict[str, Any], issues: list[str]) -> tuple[bool, str | None, str | None]:
+def _parse_options(
+    raw: dict[str, Any], issues: list[str]
+) -> tuple[bool, str | None, str | None, str | None]:
     if "prompt_cache_options" not in raw:
-        return False, None, None
+        return False, None, None, None
     options = raw["prompt_cache_options"]
     if not isinstance(options, dict):
         issues.append("prompt_cache_options is not a table")
-        return True, None, None
-    extra = sorted(key for key in options if key not in {"mode", "ttl"})
+        return True, None, None, None
+    extra = sorted(key for key in options if key not in OPTIONS_FIELDS)
     if extra:
         issues.append("prompt_cache_options has undocumented fields: " + ", ".join(extra))
     mode = options.get("mode")
     ttl = options.get("ttl")
+    comparison = options.get("comparison_response_id")
     if "mode" in options and not isinstance(mode, str):
         issues.append("prompt_cache_options.mode is not a string")
         mode = None
     if "ttl" in options and not isinstance(ttl, str):
         issues.append("prompt_cache_options.ttl is not a string")
         ttl = None
-    return True, _as_str(mode), _as_str(ttl)
+    if "comparison_response_id" in options and not isinstance(comparison, str):
+        issues.append("prompt_cache_options.comparison_response_id is not a string")
+        comparison = None
+    return True, _as_str(mode), _as_str(ttl), _as_str(comparison)
 
 
 def parse_cache_declaration(raw: dict[str, Any]) -> CodexCacheDeclaration:
@@ -224,7 +236,7 @@ def parse_cache_declaration(raw: dict[str, Any]) -> CodexCacheDeclaration:
             "top-level prompt_cache_breakpoint is not official; place it on a content block"
         )
 
-    options_present, mode, ttl = _parse_options(raw, issues)
+    options_present, mode, ttl, comparison_response_id = _parse_options(raw, issues)
     key_set = "prompt_cache_key" in raw
     if key_set and not isinstance(raw.get("prompt_cache_key"), str):
         issues.append("prompt_cache_key is not a string")
@@ -242,6 +254,7 @@ def parse_cache_declaration(raw: dict[str, Any]) -> CodexCacheDeclaration:
     return CodexCacheDeclaration(
         mode=mode,
         ttl=ttl,
+        comparison_response_id=comparison_response_id,
         key_set=key_set,
         options_present=options_present,
         blocks=tuple(blocks),
