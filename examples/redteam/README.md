@@ -26,7 +26,7 @@ is. Each pair isolates one gate:
 | [`codex-d4-full-access`](codex-d4-full-access/ATTACK.md) | Codex | `CDX-D4-01` | **C** | the effective floor (sandbox + approval + git hook) |
 | [`codex-d5-self-mutable`](codex-d5-self-mutable/ATTACK.md) | Codex | `CDX-D5-01` | **C** | keeping `~/.codex` out of `writable_roots` |
 
-For five of the six, the `vulnerable/` harness scores in the **A band on raw signal** and is
+For five of the six, the `vulnerable/` harness scores in the **A or B band on raw signal** and is
 dragged down to the cap by the single failing gate — the cleanest possible demonstration that
 the gate, not general weakness, is what bit. The sixth (`codex-d4`) grades **F** because
 Codex's bypass knobs are load-bearing across D1/D4/D5 at once; its `ATTACK.md` explains why,
