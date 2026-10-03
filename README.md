@@ -367,12 +367,41 @@ to Claude Code's `bypassPermissions`. The rubric is versioned and emitted in eve
 
 ## Development
 
+Run these commands from the repository root with `uv` and Python 3.12 available
+(`.python-version` pins 3.12; the package requires Python >=3.12). `uv sync --frozen`
+creates the local `.venv` and installs the locked development tools; its first run
+may need network access to download Python/packages. Do not refresh the lockfile
+just to verify a change.
+
 ```bash
-uv sync --frozen                                      # install dev tooling from the lockfile
-uv run --no-sync python -m unittest discover -s tests # tests (stdlib runner, zero extra deps)
-uv run --no-sync ruff check src/ tests/               # lint
-uv run --no-sync ty check src/                        # type check
+uv sync --frozen
+# Focused example: choose the test file matching the behavior changed.
+uv run --no-sync python -m unittest discover -s tests -p 'test_checks_codex_cache.py'
+# Broader checks used by .github/workflows/ci.yml:
+uv run --no-sync python -m unittest discover -s tests
+uv run --no-sync ruff check src/ tests/
+uv run --no-sync ty check src/
+# Safe CLI smoke: static repository fixtures, not personal harness directories.
+uv run --no-sync harness-scorecard scan tests/fixtures/strong_harness --min-grade A
 ```
+
+The fixture smoke does not execute the fixture's hooks or connect to providers.
+Use the explicit fixture path for verification rather than `~/.claude`, `~/.codex`,
+or machine-wide `fleet` scans. A grade below `--min-grade` exits 1; invalid input
+exits 2.
+
+For Python formatting changes, `uv run --no-sync ruff format --check src/ tests/`
+checks without rewriting files (formatting is not currently a CI gate). For
+packaging changes, `uv build` creates the wheel and source distribution in `dist/`;
+this is a local build, not a release. Publishing is a separate operation covered
+by [the release checklist](docs/RELEASE.md).
+
+For HTML/report behavior changes, run the matching renderer tests and generate
+an HTML report with the fixture scan plus `--html /path/to/scratch/scorecard.html`
+(the parent directory must exist). Open that local file in a browser and check
+changed content, readability, and layout; browser review is conditional on report
+changes, not required for pure documentation changes. Keep generated reports out
+of commits.
 
 Codex routing assumptions have a separate read-only
 [schema and model-catalog drift monitor](docs/codex-routing-facts.md). Its live result is
