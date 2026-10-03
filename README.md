@@ -15,7 +15,7 @@ with no way to tell if theirs is any good. The rubric is the product: every chec
 ```text
 $ harness-scorecard scan examples/sample-harness
 
-Harness Scorecard  v1.1.0
+Harness Scorecard  v1.6.0
 Target: examples/sample-harness   (claude-code)
 
   GRADE:  F        overall 0.28 / 1.00
@@ -68,7 +68,7 @@ A naive scorer reads a rich `hard_deny` block and awards an A. Harness Scorecard
 mode, discounts the inert block, and grades against what actually fires — `permissions.deny`
 globs plus the PreToolUse hooks. See [`docs/rubric.md`](docs/rubric.md) for the full model,
 including **capability gates** that cap the grade when a critical hole is present (you can't
-score an A with readable credentials, no matter how many cheap checks pass).
+exceed D after a FAIL on the credential capability gate, no matter how many cheap checks pass).
 
 It's honest about its own limits, too. A harness that funnels every guard through one opaque
 dispatcher script hides its logic from static analysis, so the named-guard checks under-credit
@@ -85,12 +85,12 @@ invocation cannot be reconstructed from configuration prose.
 
 The rubric claims every gated check traces to a real red-team failure mode. That claim is
 **tested**, not just stated. [`examples/redteam/`](examples/redteam/) holds a vulnerable/guarded
-fixture pair for each of the six capability gates: a plausible, otherwise-strong harness that is
-missing exactly one guard, beside its fixed twin. [`tests/test_redteam_corpus.py`](tests/test_redteam_corpus.py)
+fixture pair for each of the six capability gates: a plausible harness with a guard gap,
+beside its fixed twin. [`tests/test_redteam_corpus.py`](tests/test_redteam_corpus.py)
 mechanically asserts that the scorer **FAILs** the gated check on the vulnerable config (and the
 gate caps the grade) and **PASSes** it on the guarded one — so the moat can't quietly rot.
 
-For five of the six, the vulnerable harness scores in the **A band on raw signal** and is
+For five of the six, the vulnerable harness scores in the **A or B band on raw signal** and is
 dragged to the cap by that single gate — the cleanest demonstration that the gate, not general
 weakness, is what bit:
 
@@ -134,7 +134,7 @@ harness-scorecard scan ~/.claude --sarif harness.sarif --min-grade C
 ```
 
 `--min-grade {A,B,C,D,F}` sets the bar (default `B`). Exit codes: `0` meets the bar ·
-`1` below the bar · `2` no harness found.
+`1` below the bar · `2` invalid input (including no harness found).
 
 ### Explain a finding
 
@@ -167,7 +167,7 @@ check. Works for any check id (`HS-*` or `CDX-*`, case-insensitive); `--format j
 same content for tooling.
 
 Or skip the second command entirely — `scan --explain` folds the one-line failure mode inline
-next to every finding that isn't passing, so the *why* rides along with the grade:
+next to FAIL and PARTIAL findings, so the *why* rides along with the grade:
 
 ```text
 $ harness-scorecard scan ~/.claude --explain
@@ -207,7 +207,7 @@ below the bar — drop it in CI to keep a whole team's harnesses above a floor.
 
 The rubric grades against *our* expectations. `claims` grades against *yours*: it parses
 the rules prose (Claude Code: CLAUDE.md + `rules/*.md`; Codex: AGENTS.md + inventoried
-instruction files), extracts every enforcement claim, and answers per claim — under the
+instruction files), extracts claims using prohibition markers and hard-deny headings, and answers per claim — under the
 active permission mode — *is this actually enforced, and by what?*
 
 ```text
@@ -225,7 +225,7 @@ STYLE              rules/testing.md:38                 Do NOT use waitForTimeout
 
 Deny sets are extracted statically from hook bodies; a guard whose deny decision depends
 on live state is surfaced as a manual-review candidate, never credited — the audit can
-under-count, but it cannot claim a guarantee is enforced when it isn't. Exit is non-zero
+under-count, and matching backing does not prove that every qualifier in a guarantee is enforced. Exit is non-zero
 when a hard-deny-class claim is prose-only (`--strict` widens that to every enforcement
 claim); `--format json` / `--json FILE` emit the machine ledger. The graded counterpart
 is check `HS-D5-04`, which is N/A — never a penalty — for harnesses that state no hard
@@ -320,8 +320,7 @@ Grade your harness in CI and upload the findings to code scanning:
 
 The action writes SARIF and uploads it (requires `security-events: write`) **even when the grade
 fails the build**, so findings always reach code scanning. Commit a `baseline.json` and pass
-`baseline:` to also fail the job on any grade regression — a PR that weakens the harness can't
-merge:
+`baseline:` to also fail the job on any grade regression — a PR that lowers the grade fails the job:
 
 ```yaml
 - uses: saagpatel/harness-scorecard@v1
@@ -348,9 +347,12 @@ the run summary. The console report still goes to the step log; the Markdown goe
 
 ## Guarantees
 
-- **Read-only.** It never writes to the harness it audits.
-- **Privacy-preserving.** All output redacts secrets, tokens, emails, and absolute home
-  paths. Nothing leaves the machine.
+- **Read-only analysis.** Discovery and scoring do not write to the harness. Explicit
+  output flags write reports to caller-selected paths.
+- **Report redaction.** Scorecard, fleet, and diff reports redact email patterns,
+  recognized secret/token patterns, and the current user's home-directory prefix.
+  Redaction is heuristic; `claims` output includes unredacted source text and paths.
+  Scans do not send data off the machine.
 - **Dependency-free runtime.** The scorer ships stdlib-only — a tool that grades
   supply-chain hygiene should carry the smallest surface itself.
 

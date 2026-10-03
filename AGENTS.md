@@ -3,7 +3,7 @@
 
 ## What This Project Is
 
-harness-scorecard: A read-only linter and **A–F maturity grader for coding-agent harnesses**. Point it at a.
+harness-scorecard: A read-only linter and **A–F maturity grader for coding-agent harnesses**. Point it at a Claude Code or Codex harness directory.
 
 ## Current State
 
@@ -31,7 +31,7 @@ harness-scorecard scan ~/.claude --sarif harness.sarif --min-grade C
 ```
 
 `--min-grade {A,B,C,D,F}` sets the bar (default `B`). Exit codes: `0` meets the bar ·
-`1` below the bar · `2` no harness found.
+`1` below the bar · `2` invalid input (including no harness found).
 
 ## Known Risks
 

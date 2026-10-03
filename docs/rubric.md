@@ -29,19 +29,22 @@ For a **Codex** harness, the equivalent surface (sandbox, approval policy, trust
 `hooks.json`, `AGENTS.md`) and its `CDX-*` checks are documented in §6.
 
 **Not graded (out of scope for v1):** runtime behavior, the quality of agent *output*,
-the repository the agent works on (that is a different subject — see
-`ai-harness-scorecard`, which grades repos), or anything requiring execution. We grade
-only what is **statically observable** by reading config.
+general repository quality (that is a different subject — see
+`ai-harness-scorecard`, which grades repos), or anything requiring harness execution.
+Configuration checks grade what is **statically observable** by reading config; the
+repo-root receipt check additionally reads git state and a local SQLite database.
 
 ## 2. Detectability model
 
 Every check is tagged with how confidently config-reading can confirm it:
 
-- **STATIC** — presence/absence is fully determinable from config. The scorer is authoritative.
+- **STATIC** — the configured signal is statically detectable; runtime efficacy is not proven.
 - **PARTIAL** — presence is static, but *efficacy* or *coverage* is behavioral. The scorer
   credits presence and flags the residual uncertainty in the finding.
 - **RUNTIME** — only observable by executing the harness. **Never silently scored.** Surfaced
   as an informational note, never folded into the grade.
+
+Known gap: HS-D10-03 is tagged RUNTIME but currently scored like other checks (checks/receipt_discipline.py:196, scoring.py:46-48).
 
 A scorer that pretends RUNTIME signals are STATIC is lying. We don't.
 
@@ -78,8 +81,8 @@ Each check returns one of:
 
 | Status | Value | Meaning |
 |---|---|---|
-| `PASS` | 1.0 | Guard present and effective |
-| `PARTIAL` | 0.5 | Guard partially present, or present but PARTIAL-detectability |
+| `PASS` | 1.0 | Configured guard signal credited |
+| `PARTIAL` | 0.5 | Partial credit returned by the check; detectability is separate |
 | `FAIL` | 0.0 | Guard absent or inert |
 | `UNKNOWN` | — | Material state exists but static evidence cannot resolve it; visible in every output and excluded from the denominator |
 | `NOT_APPLICABLE` | — | Excluded from the denominator (e.g., Codex-only check on a CC harness) |
@@ -162,6 +165,7 @@ harness shows in config. *Failure mode* = the documented incident it guards agai
   `**/.env*`. PASS = all core paths; PARTIAL = some; FAIL = none.
   Failure mode: agent (or an injected instruction) reads private keys / cloud creds and exfiltrates.
   Proof: [`examples/redteam/claude-d1-credential-exposure`](../examples/redteam/claude-d1-credential-exposure/ATTACK.md).
+  Known gap: the scorer currently matches substrings in any deny entry; Read-tool and glob coverage are not yet verified.
 - **HS-D1-02 — Sensitive-read Bash backstop (3, STATIC)**
   Signal: a PreToolUse `Bash` hook that re-blocks sensitive-file reads, so a crafted
   `cat ~/.ssh/id_rsa` can't slip past tool-level denies. Failure mode: deny lists only
@@ -169,6 +173,7 @@ harness shows in config. *Failure mode* = the documented incident it guards agai
 - **HS-D1-03 — Write-time secret scanning (3, STATIC)**
   Signal: a PreToolUse `Edit`/`Write` secret detector and/or a PostToolUse secret scan.
   Failure mode: an API key gets written into a file and committed.
+  Known gap: the scorer currently credits a PreToolUse `detect-secrets` hook matching `Write` or a PostToolUse `semgrep` hook; Edit coverage and other secret detectors are not checked.
 - **HS-D1-04 — Harness token/state store protected (2, STATIC)**
   Signal: `permissions.deny` covers the harness's own approval-token / state store.
   Failure mode: forging approval tokens by reading the token store.
@@ -183,6 +188,7 @@ harness shows in config. *Failure mode* = the documented incident it guards agai
 
 - **HS-D2-01 — Network-egress guard on Bash (4, STATIC)**: PreToolUse hook inspecting
   `curl`/`wget` for exfil; `wget` denied. FM: `curl --data @secret` to attacker host.
+  Known gap: the scorer currently credits a PreToolUse `Bash` hook naming `bash-egress-guard` or `remote-command-guard` without verifying curl/wget inspection; a deny entry containing `wget` alone earns PARTIAL, and is not required for PASS.
 - **HS-D2-02 — MCP resource enumeration denied (3, STATIC)**: `ListMcpResourcesTool(*)` /
   `ReadMcpResourceTool(*)` in `permissions.deny`. FM: bulk resource dump.
 - **HS-D2-03 — MCP output cap set (2, STATIC)**: `env.MAX_MCP_OUTPUT_TOKENS` bounded. FM:
@@ -195,8 +201,10 @@ harness shows in config. *Failure mode* = the documented incident it guards agai
 - **HS-D3-02 — Inbound-content sentinels present (4, PARTIAL)**: PostToolUse sentinels on
   all three inbound vectors — MCP output, web fetch/search, file read/grep. PARTIAL:
   presence STATIC, defusing efficacy behavioral. FM: prompt injection via fetched/returned text.
+  Known gap: the scorer currently checks named PostToolUse sentinels on a representative MCP tool, `WebFetch`, and `Read`; search/grep coverage and defusing efficacy are not verified.
 - **HS-D3-03 — PreToolUse matcher breadth (3, STATIC)**: guards match
   `Bash|mcp__.*|Read|Edit|Write`, not Bash alone. FM: narrow matchers leave lanes open.
+  Known gap: the scorer currently awards PASS for coverage of a representative MCP tool and any one of `Read`, `Edit`, or `Write`; Bash and all file lanes are not required.
 
 ### D4 — Destructive-action & git safety (weight 5, GATE)
 
@@ -217,8 +225,8 @@ harness shows in config. *Failure mode* = the documented incident it guards agai
   Signal: a PreToolUse `Bash` hook requiring a confirm-token for `*-add`/`install`, or a
   lockfile-freeze guard. Failure mode: unvetted package pulled into the tree.
 - **HS-D4-05 — Force-push / history-rewrite policy (3, PARTIAL)**
-  Signal: a `git-safety` hook covering `--force`/`--no-verify`; PARTIAL because policy
-  documented only in `rules/*.md` is advisory. Failure mode: force-push drops origin-ahead commits.
+  Signal: a PreToolUse `Bash` hook naming `git-safety` or `core-guard`; PARTIAL if
+  only a rule filename contains `force` or `git-safety`. Failure mode: force-push drops origin-ahead commits.
 
 ### D5 — Harness self-protection & integrity (weight 5, GATE)
 
@@ -267,6 +275,7 @@ harness shows in config. *Failure mode* = the documented incident it guards agai
 
 - **HS-D9-01 — Skill-install provenance gate (3, STATIC)**: PreToolUse Write/Edit
   skill-install guard + a provenance rule. FM: a skill pack silently clobbers a user skill.
+  Known gap: the scorer currently checks a PreToolUse `skill-install` guard on both Write and Edit; a provenance rule is not checked.
 - **HS-D9-02 — Skill-catalog injection bounds (2, STATIC)**: `skillListingBudgetFraction`
   and `maxSkillDescriptionChars` set. FM: re-injecting the full skill catalog blows context.
 
@@ -450,10 +459,11 @@ surface offers.
 
 ## 7. Privacy & redaction
 
-Inputs are **read-only**; the tool never writes to the audited harness. All emitted output
-(console, JSON, HTML, SARIF) redacts: absolute home paths → `~` (anywhere in the text, not just
-as a prefix), anything resembling a secret / token / key, and any email address. The report cites *what kind* of guard is present or
-missing, never the secret values a guard protects. Nothing leaves the machine.
+Discovery and scoring are **read-only**; explicit output flags write reports to
+caller-selected paths. Scorecard reports (console, JSON, HTML, SARIF), fleet, and diff
+redact the current user's home-directory prefix → `~`, recognized secret/token
+patterns, and email patterns. Redaction is heuristic; `claims` output includes
+unredacted source text and paths. Scans do not send data off the machine.
 
 ## 8. Rubric versioning
 
