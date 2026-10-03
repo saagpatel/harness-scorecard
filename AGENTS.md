@@ -15,6 +15,10 @@ Portfolio truth currently marks this project as `active` with `boilerplate` cont
 
 ## How To Run
 
+For development setup, fixture-only verification, focused tests, lint/type checks,
+and conditional report/browser checks, use [README Development](README.md#development).
+The examples below are user-invoked audits, not the development smoke test.
+
 ```bash
 # Grade a harness directory (e.g. your ~/.claude)
 harness-scorecard scan ~/.claude
