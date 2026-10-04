@@ -8,6 +8,11 @@ All notable changes to Harness Scorecard are documented here. The format follows
 
 ### Added
 
+- **`diff` warns when the rubric version differs.** Comparing reports graded against
+  different rubrics (for example a 1.6.0 baseline and a 1.7.0 scan) now prints a warning,
+  and JSON output carries `old_rubric_version`, `new_rubric_version` and `rubric_changed`.
+  A grade move may come from the rubric rather than the harness. Exit codes are unchanged.
+
 - **GPT-5.6 cache-breakpoint hygiene.** `CDX-D7-05` inspects persistent Codex configuration
   for the official Responses API fields `prompt_cache_options.mode` (`explicit`/`implicit`),
   `prompt_cache_options.ttl` (`30m`), optional string
