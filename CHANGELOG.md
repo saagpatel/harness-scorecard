@@ -25,6 +25,14 @@ All notable changes to Harness Scorecard are documented here. The format follows
 
 ### Fixed
 
+- **RUNTIME checks are no longer graded.** The rubric (§2) says RUNTIME signals are surfaced
+  as information and never folded into the grade, but `HS-D10-03` (peer-agent branch receipt
+  discipline) was scored like any other check. RUNTIME checks are now excluded from dimension
+  and overall scores and can never trip a gate cap; the report lists each one as a caveat.
+  A dimension whose only applicable checks are RUNTIME drops out of the overall score, as an
+  all-N/A dimension does. Rubric 1.7.0: grades can change for harnesses where `HS-D10-03`
+  previously counted.
+
 - **`CDX-D7-05` accepts official `prompt_cache_options.comparison_response_id`.** A
   string diagnostic baseline is documented on Responses `PromptCacheOptions` and does
   not change cache-write hygiene. A non-string value, or any other extra options

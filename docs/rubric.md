@@ -44,8 +44,6 @@ Every check is tagged with how confidently config-reading can confirm it:
 - **RUNTIME** — only observable by executing the harness. **Never silently scored.** Surfaced
   as an informational note, never folded into the grade.
 
-Known gap: HS-D10-03 is tagged RUNTIME but currently scored like other checks (checks/receipt_discipline.py:196, scoring.py:46-48).
-
 A scorer that pretends RUNTIME signals are STATIC is lying. We don't.
 
 ## 3. The effective-enforcement floor (the core insight)
@@ -468,5 +466,6 @@ unredacted source text and paths. Scans do not send data off the machine.
 ## 8. Rubric versioning
 
 The rubric is versioned (`RUBRIC_VERSION`) and emitted in every report so a grade is
-reproducible against a known rubric. Adding/retiring checks bumps the version. Current
-rubric: **1.6.0**. Check IDs (`HS-Dn-nn` / `CDX-Dn-nn`) are stable and never reused.
+reproducible against a known rubric. Adding/retiring checks, or changing which checks count
+toward the grade, bumps the version. Current
+rubric: **1.7.0**. Check IDs (`HS-Dn-nn` / `CDX-Dn-nn`) are stable and never reused.
