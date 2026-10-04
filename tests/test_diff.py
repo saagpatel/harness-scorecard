@@ -54,12 +54,13 @@ def _card(
     dimensions: list[DimensionResult],
     *,
     harness_type: str = "claude-code",
+    rubric_version: str = "1.0.0",
 ) -> Scorecard:
     gate_caps = [c for dim in dimensions for c in dim.checks if c.triggered_gate_cap is not None]
     return Scorecard(
         harness_path="~/.claude",
         harness_type=harness_type,
-        rubric_version="1.0.0",
+        rubric_version=rubric_version,
         overall_score=overall,
         grade=grade,
         dimensions=dimensions,
@@ -197,6 +198,36 @@ class TestDiffRender(unittest.TestCase):
         new = _card(Grade.B, 0.82, [_dim("D1", 1.0, checks)], harness_type="codex")
         text = render_diff_console(diff_scorecards(old, new))
         self.assertIn("different harness types", text)
+
+    def test_console_warns_when_rubric_versions_differ(self) -> None:
+        checks = [_check("HS-D1-01", "D1", Status.PASS)]
+        old = _card(Grade.B, 0.82, [_dim("D1", 1.0, checks)], rubric_version="1.6.0")
+        new = _card(Grade.B, 0.82, [_dim("D1", 1.0, checks)], rubric_version="1.7.0")
+        diff = diff_scorecards(old, new)
+        self.assertTrue(diff.rubric_changed)
+        text = render_diff_console(diff)
+        # Shown even when nothing else changed.
+        self.assertIn("rubric changed (1.6.0 -> 1.7.0)", text)
+        self.assertIn("No change", text)
+
+    def test_same_rubric_has_no_warning(self) -> None:
+        checks = [_check("HS-D1-01", "D1", Status.PASS)]
+        old = _card(Grade.B, 0.82, [_dim("D1", 1.0, checks)])
+        new = _card(Grade.C, 0.71, [_dim("D1", 0.5, [_check("HS-D1-01", "D1", Status.FAIL)])])
+        diff = diff_scorecards(old, new)
+        self.assertFalse(diff.rubric_changed)
+        self.assertNotIn("rubric changed", render_diff_console(diff))
+
+    def test_json_reports_rubric_versions(self) -> None:
+        checks = [_check("HS-D1-01", "D1", Status.PASS)]
+        old = _card(Grade.B, 0.82, [_dim("D1", 1.0, checks)], rubric_version="1.6.0")
+        new = _card(Grade.C, 0.71, [_dim("D1", 0.5, checks)], rubric_version="1.7.0")
+        payload = json.loads(render_diff_json(diff_scorecards(old, new)))
+        self.assertEqual(payload["old_rubric_version"], "1.6.0")
+        self.assertEqual(payload["new_rubric_version"], "1.7.0")
+        self.assertTrue(payload["rubric_changed"])
+        # The warning does not change the CI contract: a grade regression still regresses.
+        self.assertTrue(payload["grade_regressed"])
 
     def test_json_is_machine_readable(self) -> None:
         old = _card(Grade.B, 0.82, [_dim("D1", 1.0, [_check("HS-D1-01", "D1", Status.PASS)])])

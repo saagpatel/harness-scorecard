@@ -65,6 +65,8 @@ class ScorecardDiff:
     new_overall: float
     old_harness_type: str
     new_harness_type: str
+    old_rubric_version: str
+    new_rubric_version: str
     check_deltas: list[CheckDelta]
     dimension_deltas: list[DimensionDelta]
     gate_deltas: list[GateDelta]
@@ -77,6 +79,12 @@ class ScorecardDiff:
     @property
     def grade_improved(self) -> bool:
         return grade_rank(self.new_grade) > grade_rank(self.old_grade)
+
+    @property
+    def rubric_changed(self) -> bool:
+        """The two cards were graded against different rubrics, so a grade move may not mean
+        the harness changed (e.g. checks added, retired, or excluded from the grade)."""
+        return self.old_rubric_version != self.new_rubric_version
 
     @property
     def has_changes(self) -> bool:
@@ -184,6 +192,8 @@ def diff_scorecards(old: Scorecard, new: Scorecard) -> ScorecardDiff:
         new_overall=new.overall_score,
         old_harness_type=old.harness_type,
         new_harness_type=new.harness_type,
+        old_rubric_version=old.rubric_version,
+        new_rubric_version=new.rubric_version,
         check_deltas=_check_deltas(old, new),
         dimension_deltas=_dimension_deltas(old, new),
         gate_deltas=_gate_deltas(old, new),
@@ -225,6 +235,13 @@ def render_diff_console(diff: ScorecardDiff) -> str:
             f"  note: comparing different harness types "
             f"({redact_text(diff.old_harness_type)} -> {redact_text(diff.new_harness_type)}); "
             f"deltas may be noisy."
+        )
+    if diff.rubric_changed:
+        out.append(
+            f"  warning: rubric changed ({redact_text(diff.old_rubric_version)} -> "
+            f"{redact_text(diff.new_rubric_version)}); grade and check moves may come from the "
+            f"rubric, not the harness. Re-scan the baseline with this version to compare like "
+            f"for like."
         )
     out.append("")
 
@@ -274,6 +291,9 @@ def to_diff_dict(diff: ScorecardDiff) -> dict[str, Any]:
         "new_overall": round(diff.new_overall, _SCORE_DP),
         "old_harness_type": redact_text(diff.old_harness_type),
         "new_harness_type": redact_text(diff.new_harness_type),
+        "old_rubric_version": redact_text(diff.old_rubric_version),
+        "new_rubric_version": redact_text(diff.new_rubric_version),
+        "rubric_changed": diff.rubric_changed,
         "checks_changed": [
             {
                 "id": c.id,
