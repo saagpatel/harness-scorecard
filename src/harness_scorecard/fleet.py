@@ -64,9 +64,10 @@ def _card_weakest_dimension(card: Scorecard) -> DimensionResult | None:
 def fleet_weakest_dimension(cards: list[Scorecard]) -> tuple[str, str, float] | None:
     """The dimension with the lowest *average* score across the fleet: (id, name, avg).
 
-    Both adapters implement the same 10 shared dimensions, so coverage is uniform and the
-    averages compare equal sample sizes. If a future adapter ever reports a different dimension
-    set, weight by coverage here before calling the result "fleet-wide".
+    Each dimension is averaged only over the harnesses where it is graded (a dimension that is
+    all N/A, all waived, or RUNTIME-only for a harness is skipped rather than counted as 0.00),
+    so averages can rest on different sample sizes. If that skew ever matters, weight by
+    coverage here before calling the result "fleet-wide".
     """
     scores: dict[str, list[float]] = {}
     names: dict[str, str] = {}
