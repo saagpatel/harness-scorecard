@@ -261,6 +261,11 @@ harness-scorecard diff old.json new.json --format json
 ```
 
 Exit codes: `0` no regression (same or better grade) · `1` grade regressed · `2` invalid input.
+
+If the two reports were graded against different rubric versions, `diff` prints a warning (and
+sets `rubric_changed` in JSON output): a grade move may come from the rubric rather than the
+harness, so re-scan the baseline with the current version before reading the result. The exit
+code is unchanged.
 Gate and dimension moves are reported for context; the **letter grade** is what fails the gate.
 
 ### Accept known gaps with a policy file
