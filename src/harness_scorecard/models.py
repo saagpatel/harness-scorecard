@@ -9,7 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import StrEnum
 
-RUBRIC_VERSION = "1.6.0"
+RUBRIC_VERSION = "1.7.0"
 
 
 class Status(StrEnum):
@@ -117,9 +117,19 @@ class CheckResult:
     credit_source: str = ""
 
     @property
+    def is_runtime(self) -> bool:
+        """RUNTIME checks are reported for information only and never graded (rubric §2)."""
+        return self.detectability is Detectability.RUNTIME
+
+    @property
+    def counts_toward_grade(self) -> bool:
+        """Applicable (non-N/A and non-UNKNOWN), not waived, and not RUNTIME."""
+        return self.status.score is not None and not self.waived and not self.is_runtime
+
+    @property
     def triggered_gate_cap(self) -> Grade | None:
-        """The cap this check imposes, if it is a gate and it failed (and is not waived)."""
-        if self.waived:
+        """The cap this check imposes, if it is a gate and it failed (not waived, not RUNTIME)."""
+        if self.waived or self.is_runtime:
             return None
         if self.is_gate and self.status is Status.FAIL:
             return self.gate_cap

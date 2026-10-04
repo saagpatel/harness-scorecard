@@ -54,7 +54,8 @@ _WORD = re.compile(r"[A-Za-z0-9]+")
 
 
 def _result_level(check: CheckResult) -> str:
-    if check.status is Status.UNKNOWN:
+    # UNKNOWN and RUNTIME results never affect the grade, so they are only ever notes.
+    if check.status is Status.UNKNOWN or check.is_runtime:
         return "note"
     base = _SEVERITY_LEVEL[check.severity]
     return _DOWNGRADE[base] if check.status is Status.PARTIAL else base

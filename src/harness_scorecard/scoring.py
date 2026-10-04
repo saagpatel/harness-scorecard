@@ -43,14 +43,16 @@ class ScorableConfig(Protocol):
 
 
 def _scores(checks: list[CheckResult]) -> list[tuple[int, float]]:
-    """(weight, score) for each check that counts: applicable (non-N/A) and not waived."""
+    """(weight, score) for each check that counts toward the grade (see CheckResult)."""
     return [
-        (c.weight, c.status.score) for c in checks if c.status.score is not None and not c.waived
+        (c.weight, score)
+        for c in checks
+        if c.counts_toward_grade and (score := c.status.score) is not None
     ]
 
 
 def _weighted_score(checks: list[CheckResult]) -> float:
-    """Weighted average of counting check scores (N/A and waived checks excluded)."""
+    """Weighted average of counting check scores (N/A, waived and RUNTIME checks excluded)."""
     scored = _scores(checks)
     total_weight = sum(weight for weight, _ in scored)
     if total_weight == 0:
@@ -59,7 +61,7 @@ def _weighted_score(checks: list[CheckResult]) -> float:
 
 
 def _dimension_applies(dimension: DimensionResult) -> bool:
-    """A dimension counts only if at least one of its checks counts (non-N/A and unwaived)."""
+    """A dimension counts only if at least one of its checks counts toward the grade."""
     return bool(_scores(dimension.checks))
 
 
@@ -80,15 +82,26 @@ def _apply_policy(results: list[CheckResult], policy: Policy) -> list[str]:
     """Apply an operator policy in place. Returns transparency notes for the report.
 
     Dispatcher credits run first (FAIL -> PARTIAL), then waivers exclude any remaining non-PASS
-    finding. Both surface a note when they target a check that passes or doesn't exist, so a stale
-    policy entry is visible rather than silently inert.
+    finding. Both surface a note when they target a check that passes, is RUNTIME (never graded),
+    or doesn't exist, so a stale policy entry is visible rather than silently inert.
     """
     by_id = {result.id: result for result in results}
+    return [
+        *_apply_credits(by_id, policy.dispatcher_credits),
+        *_apply_waivers(by_id, policy.waiver_map),
+    ]
+
+
+def _apply_credits(by_id: Mapping[str, CheckResult], credited_ids: Sequence[str]) -> list[str]:
     notes: list[str] = []
-    for check_id in policy.dispatcher_credits:
+    for check_id in credited_ids:
         result = by_id.get(check_id)
         if result is None:
             notes.append(f"dispatcher credit for unknown check {check_id} (ignored)")
+        elif result.is_runtime:
+            notes.append(
+                f"dispatcher credit for {check_id} is unnecessary (RUNTIME checks are never graded)"
+            )
         elif result.status is Status.FAIL:
             result.status = Status.PARTIAL
             result.dispatcher_credited = True
@@ -97,10 +110,17 @@ def _apply_policy(results: list[CheckResult], policy: Policy) -> list[str]:
             notes.append(
                 f"dispatcher credit for {check_id} is unnecessary (the check is not failing)"
             )
-    for check_id, reason in policy.waiver_map.items():
+    return notes
+
+
+def _apply_waivers(by_id: Mapping[str, CheckResult], waivers: Mapping[str, str]) -> list[str]:
+    notes: list[str] = []
+    for check_id, reason in waivers.items():
         result = by_id.get(check_id)
         if result is None:
             notes.append(f"waiver for unknown check {check_id} (ignored)")
+        elif result.is_runtime:
+            notes.append(f"waiver for {check_id} is unnecessary (RUNTIME checks are never graded)")
         elif result.status is Status.PASS:
             notes.append(f"waiver for {check_id} is unnecessary (check passes)")
         elif result.status is Status.NOT_APPLICABLE:
@@ -130,7 +150,7 @@ def _apply_detection(
     notes: list[str] = []
     for check_id, evidence in detected.items():
         result = by_id.get(check_id)
-        if result is None or result.waived or result.status is not Status.FAIL:
+        if result is None or result.waived or result.is_runtime or result.status is not Status.FAIL:
             continue
         if credit and not result.is_gate:
             result.status = Status.PARTIAL

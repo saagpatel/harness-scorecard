@@ -15,7 +15,7 @@ with no way to tell if theirs is any good. The rubric is the product: every chec
 ```text
 $ harness-scorecard scan examples/sample-harness
 
-Harness Scorecard  v1.6.0
+Harness Scorecard  v1.7.0
 Target: examples/sample-harness   (claude-code)
 
   GRADE:  F        overall 0.28 / 1.00

@@ -47,6 +47,8 @@ def _check_row(check: dict[str, Any]) -> str:
         if check.get("dispatcher_credited")
         else ""
     )
+    if check.get("detectability") == "runtime":
+        credited += ' <span class="credited">RUNTIME, not graded</span>'
     evidence = "".join(f"<li>{_esc(item)}</li>" for item in check["evidence"])
     evidence_html = f'<ul class="evidence">{evidence}</ul>' if evidence else ""
     if waived:

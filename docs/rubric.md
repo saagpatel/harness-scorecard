@@ -44,8 +44,6 @@ Every check is tagged with how confidently config-reading can confirm it:
 - **RUNTIME** — only observable by executing the harness. **Never silently scored.** Surfaced
   as an informational note, never folded into the grade.
 
-Known gap: HS-D10-03 is tagged RUNTIME but currently scored like other checks (checks/receipt_discipline.py:196, scoring.py:46-48).
-
 A scorer that pretends RUNTIME signals are STATIC is lying. We don't.
 
 ## 3. The effective-enforcement floor (the core insight)
@@ -288,7 +286,8 @@ harness shows in config. *Failure mode* = the documented incident it guards agai
 - **HS-D10-03 — Peer-agent branch receipt discipline (1, RUNTIME)**: read-only git +
   bridge-db lookup verifies any `codex/*` or `cc/*` branch with commits ahead of `main` has a
   matching `activity_log.branch` receipt for the repo. FM: writing task shipped with no durable
-  proof receipt. This is suggest-only; it is not a capability gate.
+  proof receipt. This is suggest-only; it is not a capability gate. Informational only:
+  excluded from the grade (§2).
 
 ## 6. Codex adapter — same rubric, different guard surface
 
@@ -446,7 +445,8 @@ surface offers.
 - **CDX-D10-02 — Turn completion observable (1, STATIC)**: `notify` configured (PASS) or a
   `Stop` hook (PARTIAL).
 - **HS-D10-03 — Peer-agent branch receipt discipline (1, RUNTIME)**: shared with the Claude
-  suite because it grades repo proof receipts rather than Codex config syntax.
+  suite because it checks repo proof receipts rather than Codex config syntax. Informational
+  only: excluded from the grade (§2).
 
 > **Static-analysis limit (opaque dispatcher pattern):** a harness that routes every hook through
 > one opaque dispatcher (e.g. `pre_tool_use_dispatch.py`) hides its security logic from
@@ -468,5 +468,6 @@ unredacted source text and paths. Scans do not send data off the machine.
 ## 8. Rubric versioning
 
 The rubric is versioned (`RUBRIC_VERSION`) and emitted in every report so a grade is
-reproducible against a known rubric. Adding/retiring checks bumps the version. Current
-rubric: **1.6.0**. Check IDs (`HS-Dn-nn` / `CDX-Dn-nn`) are stable and never reused.
+reproducible against a known rubric. Adding/retiring checks, or changing which checks count
+toward the grade, bumps the version. Current
+rubric: **1.7.0**. Check IDs (`HS-Dn-nn` / `CDX-Dn-nn`) are stable and never reused.

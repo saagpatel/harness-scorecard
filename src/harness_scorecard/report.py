@@ -34,6 +34,8 @@ def _pending_dimension_ids(card: Scorecard) -> list[str]:
 
 def _check_line(check: CheckResult, *, explain: bool = False) -> list[str]:
     gate = f"  [GATE->{check.gate_cap.value}]" if check.is_gate and check.gate_cap else ""
+    if check.is_runtime:
+        gate += "  (RUNTIME, not graded)"
     tag = "WAIV" if check.waived else _STATUS_TAG[check.status]
     credited = ""
     if check.dispatcher_credited:
@@ -137,10 +139,17 @@ def render_console(card: Scorecard, *, explain: bool = False) -> str:
     out.extend(_policy_summary_lines(card))
 
     for dim in card.dimensions:
-        # Distinguish a dimension excluded by waivers from one that genuinely scored 0.00.
-        counting = [c for c in dim.checks if not c.waived and c.status.score is not None]
+        # Distinguish a dimension excluded from the grade from one that genuinely scored 0.00.
+        counting = [c for c in dim.checks if c.counts_toward_grade]
         all_waived = not counting and any(c.waived for c in dim.checks)
-        excluded = "  (excluded: all findings waived)" if all_waived else ""
+        runtime_only = not counting and any(
+            c.is_runtime and c.status.score is not None for c in dim.checks
+        )
+        excluded = ""
+        if all_waived:
+            excluded = "  (excluded: all findings waived)"
+        elif runtime_only:
+            excluded = "  (excluded: only RUNTIME checks, which are not graded)"
         out.append(f"  {dim.id}  {dim.name}    {dim.score:.2f}  [weight {dim.weight}]{excluded}")
         for check in dim.checks:
             out.extend(_check_line(check, explain=explain))
