@@ -5,8 +5,14 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from harness_scorecard.checks.base import Check, failed, passed
+from harness_scorecard.fleet import fleet_weakest_dimension
+from harness_scorecard.htmlreport import render_html
 from harness_scorecard.models import Detectability, Grade
+from harness_scorecard.policy import Policy, Waiver
+from harness_scorecard.report import render_console
+from harness_scorecard.sarif import to_sarif
 from harness_scorecard.scoring import score_harness
+from harness_scorecard.summary import render_github_summary
 
 
 @dataclass
@@ -72,16 +78,64 @@ class TestRuntimeChecksAreNotGraded(unittest.TestCase):
         self.assertEqual(card.gate_caps, [])
         self.assertEqual(card.grade, Grade.A)
 
-    def test_runtime_result_is_still_reported_with_a_caveat(self) -> None:
-        config = _Config(caveats=["existing caveat"])
+    def test_runtime_result_is_reported_and_marked_not_graded(self) -> None:
         card = score_harness(
-            config, checks=[_static("S1", "D10", ok=True), _runtime("R1", "D10", ok=False)]
+            _Config(caveats=["existing caveat"]),
+            checks=[_static("S1", "D10", ok=True), _runtime("R1", "D10", ok=False)],
         )
         reported = [c for d in card.dimensions for c in d.checks if c.id == "R1"]
         self.assertEqual(len(reported), 1)
-        self.assertEqual(card.caveats[0], "existing caveat")
-        self.assertIn("R1", card.caveats[1])
-        self.assertIn("not graded", card.caveats[1])
+        self.assertEqual(card.caveats, ["existing caveat"])
+        console = render_console(card)
+        self.assertIn("R1", console)
+        self.assertIn("(RUNTIME, not graded)", console)
+        self.assertIn("RUNTIME, not graded", render_github_summary(card))
+        self.assertIn("RUNTIME, not graded", render_html(card))
+
+    def test_runtime_only_dimension_is_labelled_excluded(self) -> None:
+        card = score_harness(
+            _Config(),
+            checks=[_static("S1", "D1", ok=True), _runtime("R1", "D10", ok=False)],
+        )
+        self.assertIn("(excluded: only RUNTIME checks, which are not graded)", render_console(card))
+
+    def test_fleet_never_names_a_runtime_only_dimension_weakest(self) -> None:
+        card = score_harness(
+            _Config(),
+            checks=[_static("S1", "D1", ok=False), _runtime("R1", "D10", ok=False)],
+        )
+        weakest = fleet_weakest_dimension([card])
+        self.assertIsNotNone(weakest)
+        assert weakest is not None
+        self.assertEqual(weakest[0], "D1")
+
+    def test_sarif_reports_runtime_failures_as_notes(self) -> None:
+        card = score_harness(
+            _Config(),
+            checks=[_static("S1", "D1", ok=True), _runtime("R1", "D10", ok=False)],
+        )
+        results = to_sarif(card)["runs"][0]["results"]
+        levels = {r["ruleId"]: r["level"] for r in results}
+        self.assertEqual(levels.get("R1"), "note")
+
+
+class TestPolicyOnRuntimeChecks(unittest.TestCase):
+    def test_waiver_and_credit_on_runtime_check_are_flagged_unnecessary(self) -> None:
+        policy = Policy(
+            waivers=(Waiver(check="R1", reason="accepted"),),
+            dispatcher_credits=("R1",),
+        )
+        card = score_harness(
+            _Config(),
+            checks=[_static("S1", "D1", ok=True), _runtime("R1", "D10", ok=False)],
+            policy=policy,
+        )
+        result = next(c for d in card.dimensions for c in d.checks if c.id == "R1")
+        self.assertFalse(result.waived)
+        self.assertFalse(result.dispatcher_credited)
+        notes = " | ".join(card.policy_notes)
+        self.assertIn("waiver for R1 is unnecessary (RUNTIME", notes)
+        self.assertIn("dispatcher credit for R1 is unnecessary (RUNTIME", notes)
 
 
 if __name__ == "__main__":

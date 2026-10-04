@@ -73,6 +73,8 @@ def _quote(label: str, text: str) -> list[str]:
 def _finding_block(check: CheckResult) -> list[str]:
     label = _STATUS_LABEL.get(check.status, check.status.value.upper())
     gate = f" · gate→{check.gate_cap.value}" if check.is_gate and check.gate_cap else ""
+    if check.is_runtime:
+        gate += " · RUNTIME, not graded"
     block = [f"**`{check.id}`** · {label}{gate} — {redact_text(check.title)}", ""]
     quoted: list[str] = []
     failure_mode = FAILURE_MODES.get(check.id) if check.status is not Status.UNKNOWN else None

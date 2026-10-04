@@ -46,9 +46,19 @@ def grade_distribution(cards: list[Scorecard]) -> dict[Grade, int]:
     return {grade: counts.get(grade, 0) for grade in _GRADE_DISPLAY_ORDER}
 
 
+def _graded_dimensions(card: Scorecard) -> list[DimensionResult]:
+    """Dimensions with at least one check that counts toward the grade.
+
+    A dimension that is all N/A, all waived, or only RUNTIME reports 0.00 but is excluded from
+    the grade, so it must not be named the weakest.
+    """
+    return [dim for dim in card.dimensions if any(c.counts_toward_grade for c in dim.checks)]
+
+
 def _card_weakest_dimension(card: Scorecard) -> DimensionResult | None:
-    """The lowest-scoring dimension of one harness (ties resolve by list position)."""
-    return min(card.dimensions, key=lambda dim: dim.score) if card.dimensions else None
+    """The lowest-scoring graded dimension of one harness (ties resolve by list position)."""
+    graded = _graded_dimensions(card)
+    return min(graded, key=lambda dim: dim.score) if graded else None
 
 
 def fleet_weakest_dimension(cards: list[Scorecard]) -> tuple[str, str, float] | None:
@@ -61,7 +71,7 @@ def fleet_weakest_dimension(cards: list[Scorecard]) -> tuple[str, str, float] | 
     scores: dict[str, list[float]] = {}
     names: dict[str, str] = {}
     for card in cards:
-        for dim in card.dimensions:
+        for dim in _graded_dimensions(card):
             scores.setdefault(dim.id, []).append(dim.score)
             names[dim.id] = dim.name
     if not scores:
