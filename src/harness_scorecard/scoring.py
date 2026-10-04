@@ -13,6 +13,7 @@ from harness_scorecard.checks import ALL_CHECKS, DIMENSIONS
 from harness_scorecard.models import (
     RUBRIC_VERSION,
     CheckResult,
+    Detectability,
     DimensionResult,
     Scorecard,
     Status,
@@ -42,15 +43,22 @@ class ScorableConfig(Protocol):
         ...
 
 
+def _excluded_from_grade(check: CheckResult) -> bool:
+    """Waived, or RUNTIME (rubric §2: RUNTIME signals are never folded into the grade)."""
+    return check.waived or check.detectability is Detectability.RUNTIME
+
+
 def _scores(checks: list[CheckResult]) -> list[tuple[int, float]]:
-    """(weight, score) for each check that counts: applicable (non-N/A) and not waived."""
+    """(weight, score) for each check that counts: applicable (non-N/A) and not excluded."""
     return [
-        (c.weight, c.status.score) for c in checks if c.status.score is not None and not c.waived
+        (c.weight, c.status.score)
+        for c in checks
+        if c.status.score is not None and not _excluded_from_grade(c)
     ]
 
 
 def _weighted_score(checks: list[CheckResult]) -> float:
-    """Weighted average of counting check scores (N/A and waived checks excluded)."""
+    """Weighted average of counting check scores (N/A, waived and RUNTIME checks excluded)."""
     scored = _scores(checks)
     total_weight = sum(weight for weight, _ in scored)
     if total_weight == 0:
@@ -59,7 +67,7 @@ def _weighted_score(checks: list[CheckResult]) -> float:
 
 
 def _dimension_applies(dimension: DimensionResult) -> bool:
-    """A dimension counts only if at least one of its checks counts (non-N/A and unwaived)."""
+    """A dimension counts only if at least one of its checks counts toward the grade."""
     return bool(_scores(dimension.checks))
 
 
@@ -202,6 +210,12 @@ def score_harness(
         assert result.triggered_gate_cap is not None  # noqa: S101 - narrowing for type checker
         grade = worse_grade(grade, result.triggered_gate_cap)
 
+    runtime_notes = [
+        f"{r.id} ({r.title}) is a RUNTIME check: reported for information, not graded."
+        for r in results
+        if r.detectability is Detectability.RUNTIME and r.status.score is not None
+    ]
+
     return Scorecard(
         harness_path=redact_path(str(config.root)),
         harness_type=config.harness_type,
@@ -210,6 +224,6 @@ def score_harness(
         grade=grade,
         dimensions=dimensions,
         gate_caps=gate_caps,
-        caveats=list(config.caveats),
+        caveats=[*config.caveats, *runtime_notes],
         policy_notes=policy_notes,
     )

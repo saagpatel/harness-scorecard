@@ -9,7 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import StrEnum
 
-RUBRIC_VERSION = "1.6.0"
+RUBRIC_VERSION = "1.7.0"
 
 
 class Status(StrEnum):
@@ -118,8 +118,8 @@ class CheckResult:
 
     @property
     def triggered_gate_cap(self) -> Grade | None:
-        """The cap this check imposes, if it is a gate and it failed (and is not waived)."""
-        if self.waived:
+        """The cap this check imposes, if it is a gate and it failed (not waived, not RUNTIME)."""
+        if self.waived or self.detectability is Detectability.RUNTIME:
             return None
         if self.is_gate and self.status is Status.FAIL:
             return self.gate_cap
