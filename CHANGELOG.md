@@ -28,7 +28,9 @@ All notable changes to Harness Scorecard are documented here. The format follows
 - **RUNTIME checks are no longer graded.** The rubric (§2) says RUNTIME signals are surfaced
   as information and never folded into the grade, but `HS-D10-03` (peer-agent branch receipt
   discipline) was scored like any other check. RUNTIME checks are now excluded from dimension
-  and overall scores and can never trip a gate cap; the report lists each one as a caveat.
+  and overall scores and can never trip a gate cap. Console, HTML and GitHub-summary output
+  tag them "RUNTIME, not graded", SARIF reports them as notes, and waivers or dispatcher
+  credits aimed at them produce an "unnecessary" policy note instead of doing nothing.
   A dimension whose only applicable checks are RUNTIME drops out of the overall score, as an
   all-N/A dimension does. Rubric 1.7.0: grades can change for harnesses where `HS-D10-03`
   previously counted.
