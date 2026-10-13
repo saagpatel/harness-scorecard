@@ -1,7 +1,7 @@
 """Command-line entry point: ``harness-scorecard scan <path>``.
 
 Exit codes mirror a linter contract: 0 = grade meets ``--min-grade`` (default B),
-1 = grade below the bar, 2 = invalid input (no harness found).
+1 = grade below the bar, 2 = invalid input or report-write failure.
 """
 
 from __future__ import annotations
@@ -9,6 +9,8 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import tempfile
+from contextlib import suppress
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -243,6 +245,51 @@ def _resolve_policy(root: Path, explicit: str | None) -> Policy:
     return load_policy(discovered) if discovered else EMPTY_POLICY
 
 
+def _write_reports(reports: list[tuple[str, str]], summary: tuple[str, str] | None = None) -> bool:
+    """Stage report bytes before replacing files; append summaries only as requested.
+
+    Each replacement is atomic, not the collection of outputs. A later replace or
+    summary failure may leave earlier replacements committed.
+    """
+    staged: list[tuple[Path, Path]] = []
+    destination = Path()
+    try:
+        for raw_path, content in reports:
+            destination = Path(raw_path).expanduser()
+            with tempfile.NamedTemporaryFile(
+                mode="w",
+                encoding="utf-8",
+                dir=destination.parent,
+                prefix=f".{destination.name}.",
+                suffix=".tmp",
+                delete=False,
+            ) as handle:
+                temporary = Path(handle.name)
+                staged.append((temporary, destination))
+                handle.write(content)
+        for temporary, destination in staged:
+            temporary.replace(destination)
+        if summary:
+            raw_path, content = summary
+            destination = Path(raw_path).expanduser()
+            prefix = "\n" if destination.exists() and destination.stat().st_size > 0 else ""
+            with destination.open("a", encoding="utf-8") as handle:
+                handle.write(prefix + content)
+    except OSError as exc:
+        reason = exc.strerror or str(exc)
+        print(
+            f"error: cannot write {redact_text(str(destination))}: {redact_text(reason)}",
+            file=sys.stderr,
+        )
+        return False
+    finally:
+        for temporary, _destination in staged:
+            # Best-effort cleanup must not hide the original write error.
+            with suppress(OSError):
+                temporary.unlink(missing_ok=True)
+    return True
+
+
 def _run_scan(args: argparse.Namespace) -> int:
     root = Path(args.path).expanduser()
     try:
@@ -260,23 +307,20 @@ def _run_scan(args: argparse.Namespace) -> int:
     output = (
         render_json(card) if args.format == "json" else render_console(card, explain=args.explain)
     )
+    reports = [
+        (path, renderer(card))
+        for path, renderer in (
+            (args.json_out, render_json),
+            (args.html_out, render_html),
+            (args.sarif_out, render_sarif),
+            (args.badge_out, render_badge),
+        )
+        if path
+    ]
+    summary = (args.summary_out, render_github_summary(card)) if args.summary_out else None
+    if not _write_reports(reports, summary):
+        return 2
     print(output)
-
-    if args.json_out:
-        Path(args.json_out).expanduser().write_text(render_json(card), encoding="utf-8")
-    if args.html_out:
-        Path(args.html_out).expanduser().write_text(render_html(card), encoding="utf-8")
-    if args.sarif_out:
-        Path(args.sarif_out).expanduser().write_text(render_sarif(card), encoding="utf-8")
-    if args.badge_out:
-        Path(args.badge_out).expanduser().write_text(render_badge(card), encoding="utf-8")
-    if args.summary_out:
-        # Append, not overwrite: $GITHUB_STEP_SUMMARY accumulates across job steps. Separate
-        # from any prior step's content with a blank line, but only when there is some.
-        summary_path = Path(args.summary_out).expanduser()
-        prefix = "\n" if summary_path.exists() and summary_path.stat().st_size > 0 else ""
-        with summary_path.open("a", encoding="utf-8") as handle:
-            handle.write(prefix + render_github_summary(card))
 
     return 0 if grade_rank(card.grade) >= grade_rank(Grade(args.min_grade)) else 1
 
@@ -294,9 +338,10 @@ def _run_claims(args: argparse.Namespace) -> int:
 
     report = audit_claims(config)
     output = render_claims_json(report) if args.format == "json" else render_claims_console(report)
+    reports = [(args.json_out, render_claims_json(report))] if args.json_out else []
+    if not _write_reports(reports):
+        return 2
     print(output)
-    if args.json_out:
-        Path(args.json_out).expanduser().write_text(render_claims_json(report), encoding="utf-8")
 
     # Gate philosophy mirrors `scan`: a stated hard guarantee with no surviving
     # enforcement is a failure, not a nit. --strict widens to every enforcement claim.
