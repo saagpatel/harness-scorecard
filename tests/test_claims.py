@@ -128,6 +128,7 @@ def build_codex_harness(
     agents_md: str = CODEX_AGENTS_MD,
     hook_scripts: dict[str, str] | None = None,
     hook_command_prefix: str = "hooks",
+    hook_matcher: str = "Bash",
     approval_policy: str = "on-request",
     sandbox_mode: str = "workspace-write",
 ) -> object:
@@ -151,7 +152,7 @@ def build_codex_harness(
             hook_entries.append(
                 {"type": "command", "command": f"bash {hook_command_prefix}/{name}"}
             )
-        hooks = {"PreToolUse": [{"matcher": "Bash", "hooks": hook_entries}]}
+        hooks = {"PreToolUse": [{"matcher": hook_matcher, "hooks": hook_entries}]}
     (root / "hooks.json").write_text(json.dumps({"hooks": hooks}), encoding="utf-8")
     return load_codex_harness(root)
 
@@ -323,6 +324,7 @@ class TestCodexClaimsAudit(unittest.TestCase):
             self.root,
             agents_md="# AGENTS\n\n## Hard-Deny\n\n- Read `~/vaultbox`\n",
             hook_scripts={"path-guard.sh": CODEX_PATH_GUARD},
+            hook_matcher="Bash|Read|Grep",
         )
         report = audit_claims(config)
         finding = self.by_text(report, "~/vaultbox")
@@ -428,6 +430,7 @@ class TestCodexClaimsAudit(unittest.TestCase):
             agents_md="# AGENTS\n\n## Hard-Deny\n\n- Read `~/vaultbox`\n",
             hook_scripts={"path-guard.sh": CODEX_PATH_GUARD},
             hook_command_prefix="$CODEX_HOME/hooks",
+            hook_matcher="Bash|Read|Grep",
         )
         report = audit_claims(config)
         self.assertEqual(report.scripts_read, ["path-guard.sh"])
