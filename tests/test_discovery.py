@@ -23,8 +23,9 @@ class TestStrongHarness(unittest.TestCase):
         self.assertTrue(self.config.hard_deny_effective)
 
     def test_parses_deny_globs(self):
-        self.assertTrue(self.config.deny_matches("Read(~/.ssh"))
-        self.assertTrue(self.config.deny_matches("ListMcpResourcesTool"))
+        self.assertTrue(self.config.deny_matches(".ssh", tool="Read"))
+        self.assertFalse(self.config.deny_matches(".ssh", tool="Bash"))
+        self.assertFalse(self.config.deny_matches("ListMcpResourcesTool"))
 
     def test_finds_registered_hook_with_matcher(self):
         self.assertTrue(self.config.has_hook("PreToolUse", "git-safety", matcher="Bash"))

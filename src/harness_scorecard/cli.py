@@ -383,15 +383,12 @@ def _run_fleet(args: argparse.Namespace) -> int:
         except (OSError, ValueError) as exc:
             errors.append(FleetError(path=str(path), message=str(exc)))
 
-    if not cards:
-        print("error: no gradable harness found in the given paths", file=sys.stderr)
-        for err in errors:
-            print(f"  - {redact_text(err.path)}: {redact_text(err.message)}", file=sys.stderr)
-        return 2
-
     report = FleetReport(cards=cards, errors=errors)
     output = render_fleet_json(report) if args.format == "json" else render_fleet_console(report)
     print(output)
+
+    if errors:
+        return 2
 
     bar = grade_rank(Grade(args.min_grade))
     return 1 if any(grade_rank(card.grade) < bar for card in cards) else 0

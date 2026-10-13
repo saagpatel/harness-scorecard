@@ -23,7 +23,7 @@ This is an env-hygiene problem the sandbox can't fix — the sandbox bounds wher
 - `vulnerable/` sets `ignore_default_excludes = true` → secrets are exposed to every
   subprocess → `CDX-D1-01` **FAIL** → grade capped at **D** (raw signal 0.86).
 - `guarded/` leaves it `false` (the default) → secrets scrubbed → `CDX-D1-01` **PASS** →
-  grade **A**.
+  grade **B**: the remaining Codex D3 coverage is partial under the reviewed tool-lane rules.
 
 ## The one-guard diff
 

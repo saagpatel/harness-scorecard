@@ -38,6 +38,11 @@ HARNESS_TYPE_CODEX = "codex"
 SANDBOX_READ_ONLY = "read-only"
 SANDBOX_WORKSPACE_WRITE = "workspace-write"
 SANDBOX_DANGER = "danger-full-access"
+_PERMISSION_PROFILE_MODES = {
+    ":read-only": SANDBOX_READ_ONLY,
+    ":workspace": SANDBOX_WORKSPACE_WRITE,
+    ":danger-full-access": SANDBOX_DANGER,
+}
 
 # approval_policy values.
 APPROVAL_NEVER = "never"
@@ -89,6 +94,7 @@ class CodexConfig:
     has_agents_md: bool
     agent_files: list[str]
     raw_config: dict[str, Any] = field(default_factory=dict)
+    permissions_profile: str | None = None
 
     # --- effective-floor helpers (the bypass-aware moat for Codex) -----------------
 
@@ -261,12 +267,20 @@ def load_codex_harness(root: Path | str) -> CodexConfig:
     env_policy = _as_dict(raw.get("shell_environment_policy"))
     history = _as_dict(raw.get("history"))
     agents, max_threads, max_depth = _parse_agents(raw)
+    profile_value = raw.get("default_permissions")
+    profile = profile_value if isinstance(profile_value, str) else None
+    if profile_value is not None:
+        sandbox_mode = _PERMISSION_PROFILE_MODES.get(profile, f"unknown-profile:{profile_value}")
+    else:
+        sandbox_mode = str(raw.get("sandbox_mode", SANDBOX_READ_ONLY))
+    features = _as_dict(raw.get("features"))
+    hooks_disabled = features.get("codex_hooks") is False or raw.get("hooks_enabled") is False
 
     return CodexConfig(
         root=root,
         harness_type=HARNESS_TYPE_CODEX,
         approval_policy=_approval_policy(raw),
-        sandbox_mode=str(raw.get("sandbox_mode", SANDBOX_READ_ONLY)),
+        sandbox_mode=sandbox_mode,
         web_search=str(raw.get("web_search", "off")),
         network_access=_as_bool(sandbox_write.get("network_access")),
         writable_roots=_as_str_list(sandbox_write.get("writable_roots")),
@@ -281,10 +295,15 @@ def load_codex_harness(root: Path | str) -> CodexConfig:
         trusted_projects=_parse_trusted_projects(raw),
         history_persistence=str(history["persistence"]) if "persistence" in history else None,
         notify=_as_str_list(raw.get("notify")),
-        hooks=_flatten_hooks(_read_json(root / "hooks.json").get("hooks", {})),
+        hooks=(
+            []
+            if hooks_disabled
+            else _flatten_hooks(_read_json(root / "hooks.json").get("hooks", {}))
+        ),
         has_agents_md=agents_md.is_file(),
         agent_files=_inventory_codex_agents(root / "agents"),
         raw_config=raw,
+        permissions_profile=profile,
     )
 
 

@@ -64,7 +64,7 @@ class TestRetiredChecks(unittest.TestCase):
                 contextlib.redirect_stdout(io.StringIO()),
                 contextlib.redirect_stderr(io.StringIO()),
             ):
-                self.assertEqual(main(["scan", str(harness), "--min-grade", "A"]), 0)
+                self.assertEqual(main(["scan", str(harness), "--min-grade", "B"]), 0)
             self.assertEqual(snapshot(), before)
             self.assertEqual(list(home.iterdir()), [])
 

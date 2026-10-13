@@ -9,7 +9,7 @@ exposed to every command the agent runs.
 
 from __future__ import annotations
 
-from harness_scorecard.checks.base import Check, CheckOutcome, failed, passed
+from harness_scorecard.checks.base import Check, CheckOutcome, failed, passed, unknown
 from harness_scorecard.discovery_codex import CodexConfig
 from harness_scorecard.models import Detectability, Grade, Severity
 
@@ -47,6 +47,10 @@ def _credential_read_guard(config: CodexConfig) -> CheckOutcome:
 
 
 def _sandbox_bounds_writes(config: CodexConfig) -> CheckOutcome:
+    if not config.sandbox_recognized:
+        return unknown(
+            f"Cannot resolve write boundary for sandbox/profile {config.sandbox_mode!r}."
+        )
     if not config.sandbox_disabled:
         return passed(
             f"The {config.sandbox_mode} sandbox bounds where exfiltrated secrets can be written.",

@@ -7,7 +7,7 @@ channel. Defense in depth adds an egress-monitoring hook on top of the sandbox.
 
 from __future__ import annotations
 
-from harness_scorecard.checks.base import Check, CheckOutcome, failed, partial, passed
+from harness_scorecard.checks.base import Check, CheckOutcome, failed, partial, passed, unknown
 from harness_scorecard.discovery_codex import CodexConfig
 from harness_scorecard.models import Detectability, Severity
 
@@ -22,6 +22,8 @@ def _has_egress_hook(config: CodexConfig) -> bool:
 
 
 def _network_blocked(config: CodexConfig) -> CheckOutcome:
+    if not config.sandbox_recognized:
+        return unknown(f"Cannot resolve sandbox network policy: {config.sandbox_mode!r}.")
     if config.network_blocked:
         return passed(
             "The sandbox denies outbound network to spawned commands.",
@@ -46,6 +48,8 @@ def _web_search_channel(config: CodexConfig) -> CheckOutcome:
 
 
 def _egress_monitoring(config: CodexConfig) -> CheckOutcome:
+    if not config.sandbox_recognized and not _has_egress_hook(config):
+        return unknown(f"Cannot resolve sandbox network policy: {config.sandbox_mode!r}.")
     if _has_egress_hook(config):
         return passed("An egress-guard hook monitors or blocks outbound network calls.")
     if config.network_blocked:

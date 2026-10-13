@@ -54,10 +54,10 @@ class TestScanCommand(unittest.TestCase):
         self.assertIn("(codex)", out)
         self.assertIn("Capability gates tripped", out)
 
-    def test_codex_strong_grades_a(self):
+    def test_codex_strong_grades_b_after_coverage_review(self):
         code, out = run_cli(["scan", str(FIXTURES / "codex_strong"), "--type", "codex"])
         self.assertEqual(code, 0)
-        self.assertIn("GRADE:  A", out)
+        self.assertIn("GRADE:  B", out)
         self.assertIn("Scored 10 of 10", out)
 
     def test_json_format_is_valid_json(self):

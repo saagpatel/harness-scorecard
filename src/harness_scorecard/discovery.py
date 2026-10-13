@@ -7,6 +7,8 @@ bad file can't blank the whole grade.
 
 from __future__ import annotations
 
+import fnmatch
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -62,9 +64,28 @@ class HarnessConfig:
 
     # --- query helpers -------------------------------------------------------------
 
-    def deny_matches(self, *needles: str) -> bool:
-        """True if any ``permissions.deny`` entry contains any of ``needles``."""
-        return any(needle in entry for entry in self.deny for needle in needles)
+    def deny_matches(self, *needles: str, tool: str = "Bash") -> bool:
+        """Match tokens only inside deny arguments for the requested tool."""
+        for entry in self.deny:
+            parsed = _parse_deny_rule(entry)
+            if parsed is None:
+                continue
+            rule_tool, argument = parsed
+            if rule_tool == tool and any(needle.lower() in argument.lower() for needle in needles):
+                return True
+        return False
+
+    def deny_covers_path(self, tool: str, path: str) -> bool:
+        """Whether a tool-scoped deny glob covers representative files under ``path``."""
+        samples = _path_samples(path)
+        for entry in self.deny:
+            parsed = _parse_deny_rule(entry)
+            if parsed is None or parsed[0] != tool:
+                continue
+            pattern = _canonical_path(parsed[1])
+            if all(fnmatch.fnmatchcase(sample, pattern) for sample in samples):
+                return True
+        return False
 
     def has_hook(self, event: str, command_contains: str, matcher: str | None = None) -> bool:
         """True if a hook under ``event`` whose command matches also covers ``matcher``'s lane."""
@@ -98,6 +119,31 @@ class HarnessConfig:
     def caveats(self) -> list[str]:
         """Advisory notes that reframe the grade (e.g. an opaque hook dispatcher)."""
         return detect_dispatcher_caveats(self.hooks)
+
+
+_DENY_RULE_RE = re.compile(r"^\s*([A-Za-z][A-Za-z0-9_]*)\((.*)\)\s*$")
+
+
+def _parse_deny_rule(rule: str) -> tuple[str, str] | None:
+    match = _DENY_RULE_RE.fullmatch(rule)
+    return (match.group(1), match.group(2)) if match else None
+
+
+def _canonical_path(path: str) -> str:
+    return re.sub(
+        r"(?:~|\$home|/users/[^/]+|/home/[^/]+)(?=/)",
+        "<home>",
+        path.lower().replace("\\", "/"),
+    )
+
+
+def _path_samples(path: str) -> list[str]:
+    root = _canonical_path(path).rstrip("/")
+    if root == "**/.env*":
+        return ["/workspace/.env", "/workspace/nested/.env.local"]
+    if root.startswith("<home>/"):
+        return [root + "/__credential__", root + "/nested/__credential__"]
+    return [root, root + "/__credential__"]
 
 
 def _merge_settings(base: dict[str, Any], local: dict[str, Any]) -> dict[str, Any]:
@@ -177,7 +223,11 @@ def load_harness(root: Path | str) -> HarnessConfig:
         allow=_as_str_list(permissions.get("allow")),
         env={str(k): str(v) for k, v in _as_dict(settings.get("env")).items()},
         hard_deny=_normalize_hard_deny(auto_mode.get("hard_deny")),
-        hooks=_flatten_hooks(settings.get("hooks", {})),
+        hooks=(
+            []
+            if settings.get("disableAllHooks") is True or settings.get("hooksEnabled") is False
+            else _flatten_hooks(settings.get("hooks", {}))
+        ),
         rule_files=_inventory_dir(root / "rules", ".md"),
         agent_files=_inventory_dir(root / "agents", ".md"),
         skill_dirs=_inventory_subdirs(root / "skills"),

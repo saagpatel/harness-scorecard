@@ -23,6 +23,7 @@ class HookEntry:
     event: str
     matcher: str
     command: str
+    async_hook: bool = False
 
 
 class HarnessInputError(ValueError):
@@ -76,7 +77,9 @@ def flatten_hooks(hooks_section: Any) -> list[HookEntry]:
             for hook in hooks:
                 if isinstance(hook, dict) and "command" in hook:
                     entries.append(  # noqa: PERF401 - guarded nested build reads clearer as a loop
-                        HookEntry(str(event), matcher, str(hook["command"]))
+                        HookEntry(
+                            str(event), matcher, str(hook["command"]), hook.get("async") is True
+                        )
                     )
     return entries
 
@@ -119,6 +122,7 @@ def hook_present(
     """True if a hook under ``event`` whose command matches also covers ``matcher``'s lane."""
     return any(
         hook.event == event
+        and not (event in ("PreToolUse", "PermissionRequest") and hook.async_hook)
         and command_contains in hook.command
         and matcher_covers(hook.matcher, matcher)
         for hook in hooks
@@ -134,6 +138,7 @@ def hook_on_tool(
     """Like :func:`hook_present`, but the matcher must cover ``tool_name`` (regex match)."""
     return any(
         hook.event == event
+        and not (event in ("PreToolUse", "PermissionRequest") and hook.async_hook)
         and command_contains in hook.command
         and matcher_matches_tool(hook.matcher, tool_name)
         for hook in hooks
@@ -143,10 +148,17 @@ def hook_on_tool(
 def matches_tool(hooks: Sequence[HookEntry], event: str, tool_name: str) -> bool:
     """True if any hook under ``event`` has a matcher that matches ``tool_name``."""
     return any(
-        hook.event == event and matcher_matches_tool(hook.matcher, tool_name) for hook in hooks
+        hook.event == event
+        and not (event in ("PreToolUse", "PermissionRequest") and hook.async_hook)
+        and matcher_matches_tool(hook.matcher, tool_name)
+        for hook in hooks
     )
 
 
 def event_present(hooks: Sequence[HookEntry], event: str) -> bool:
     """True when at least one hook is registered under ``event`` (any matcher)."""
-    return any(hook.event == event for hook in hooks)
+    return any(
+        hook.event == event
+        and not (event in ("PreToolUse", "PermissionRequest") and hook.async_hook)
+        for hook in hooks
+    )

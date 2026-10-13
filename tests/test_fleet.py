@@ -3,6 +3,8 @@
 import json
 import tempfile
 import unittest
+from contextlib import redirect_stdout
+from io import StringIO
 from pathlib import Path
 
 from harness_scorecard.cli import main
@@ -131,11 +133,14 @@ class TestFleetCli(unittest.TestCase):
             good.mkdir()
             bad.mkdir()
             self._bare_harness(good)
-            code = main(["fleet", str(good), str(bad), "--format", "json", "--min-grade", "F"])
-            self.assertEqual(code, 0)  # one gradable harness, no error abort
+            output = StringIO()
+            with redirect_stdout(output):
+                code = main(["fleet", str(good), str(bad), "--format", "json", "--min-grade", "F"])
+            self.assertEqual(code, 2)  # partial report is emitted, but a requested target failed
+            self.assertEqual(len(json.loads(output.getvalue())["errors"]), 1)
             # console path also works and lists the skip
             text_code = main(["fleet", str(good), str(bad), "--min-grade", "F"])
-            self.assertEqual(text_code, 0)
+            self.assertEqual(text_code, 2)
 
     def test_fleet_all_bad_paths_exits_two(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

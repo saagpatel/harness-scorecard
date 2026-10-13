@@ -45,7 +45,8 @@ STYLE             testing.md:38     Do NOT use waitForTimeout ...
 ```
 
 - Statuses: `enforced_hook` / `enforced_deny` / `enforced_both` / `candidate_logic` /
-  `prose_only` / `style_rule`.
+  `prose_only` / `unknown` / `style_rule`. Hook backing must be blocking and cover the
+  action's relevant tool lanes; unresolved Codex sandbox state remains UNKNOWN.
 - `--json` for machine output; human output cites source `file:line` and backing.
 - Exit code: non-zero when any **hard-deny-class** claim is `prose_only`
   (`--strict` widens that to all enforcement claims). Mirrors `scan`'s gate philosophy.

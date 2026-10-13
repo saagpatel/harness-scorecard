@@ -34,6 +34,7 @@ from pathlib import Path
 from harness_scorecard.discovery import HarnessConfig
 from harness_scorecard.discovery_codex import CodexConfig
 from harness_scorecard.guard_extract import extract_deny_blocks
+from harness_scorecard.parsing import matcher_matches_tool
 
 type ClaimsConfig = HarnessConfig | CodexConfig
 
@@ -53,6 +54,7 @@ class ClaimStatus(StrEnum):
     ENFORCED_BOTH = "enforced_both"
     CANDIDATE_LOGIC = "candidate_logic"
     PROSE_ONLY = "prose_only"
+    UNKNOWN = "unknown"
     STYLE_RULE = "style_rule"
 
 
@@ -356,7 +358,7 @@ def _short_command(command: str) -> str:
 class _DenyUniverse:
     """Everything a claim can be matched against, plus the honesty counters."""
 
-    pattern_index: list[tuple[str, str]] = field(default_factory=list)  # (guard, blob)
+    pattern_index: list[tuple[str, str, str, str]] = field(default_factory=list)
     logic_sources: dict[str, str] = field(default_factory=dict)
     blocks_found: int = 0
     blocks_extracted: int = 0
@@ -368,19 +370,18 @@ def _build_deny_universe(config: ClaimsConfig) -> _DenyUniverse:
     """Extract the deny sets of every readable shell guard the harness registers."""
     universe = _DenyUniverse()
     alias_prefixes = _root_alias_prefixes(config)
-    seen_commands: set[str] = set()
-    seen_scripts: set[Path] = set()
+    seen_registrations: set[tuple[str, str, str]] = set()
     for hook in config.hooks:
-        if hook.command in seen_commands:
+        if hook.event not in ("PreToolUse", "PermissionRequest") or hook.async_hook:
             continue
-        seen_commands.add(hook.command)
+        registration = (hook.command, hook.event, hook.matcher)
+        if registration in seen_registrations:
+            continue
+        seen_registrations.add(registration)
         script = _resolve_hook_script(hook.command, config.root, alias_prefixes)
         if script is None:
             universe.scripts_unread.append(_short_command(hook.command))
             continue
-        if script in seen_scripts:
-            continue
-        seen_scripts.add(script)
         text = _read(script)
         if text is None:
             # Resolved but unreadable (permissions, races): report it unread rather than
@@ -393,7 +394,7 @@ def _build_deny_universe(config: ClaimsConfig) -> _DenyUniverse:
             if block.is_extracted:
                 universe.blocks_extracted += 1
                 blob = " ".join(block.patterns + block.exceptions)
-                universe.pattern_index.append((script.name, blob))
+                universe.pattern_index.append((script.name, blob, hook.event, hook.matcher))
             else:
                 universe.logic_sources[script.name] = text
     return universe
@@ -443,12 +444,16 @@ def _codex_config_backing(config: CodexConfig) -> list[str]:
     surface as notes (see ``_audit_notes``), never as backing.
     """
     backing: list[str] = []
-    if config.network_blocked:
+    if config.sandbox_recognized and config.network_blocked:
         backing.append(
             f"sandbox:{config.sandbox_mode} denies outbound network access: "
             "network egress exfil transmit curl wget"
         )
-    if not config.sandbox_disabled and not _codex_home_writable(config):
+    if (
+        config.sandbox_recognized
+        and not config.sandbox_disabled
+        and not _codex_home_writable(config)
+    ):
         backing.append(
             f"sandbox:{config.sandbox_mode} denies writes outside writable roots; "
             "protected: ~/.codex AGENTS.md config.toml hooks.json"
@@ -521,6 +526,11 @@ def audit_claims(config: ClaimsConfig) -> ClaimsReport:
     findings = [
         _match_claim(c, universe.pattern_index, declarative, universe.logic_sources) for c in claims
     ]
+    if isinstance(config, CodexConfig) and not config.sandbox_recognized:
+        findings = [
+            ClaimFinding(f.claim, ClaimStatus.UNKNOWN) if f.status is ClaimStatus.PROSE_ONLY else f
+            for f in findings
+        ]
     return ClaimsReport(
         harness_path=str(root),
         mode=_audit_mode(config),
@@ -547,14 +557,23 @@ def _read(path: Path) -> str | None:
 
 def _match_claim(
     claim: Claim,
-    pattern_index: list[tuple[str, str]],
+    pattern_index: list[tuple[str, str, str, str]],
     declarative_rules: list[tuple[str, str]],
     logic_sources: dict[str, str],
 ) -> ClaimFinding:
     if claim.claim_class is ClaimClass.STYLE:
         return ClaimFinding(claim, ClaimStatus.STYLE_RULE)
 
-    hook_hits = sorted({guard for guard, blob in pattern_index if match_tokens(claim.tokens, blob)})
+    required_tools = _claim_tool_lanes(claim)
+    hook_hits = sorted(
+        {
+            guard
+            for guard, blob, event, matcher in pattern_index
+            if event in ("PreToolUse", "PermissionRequest")
+            and all(matcher_matches_tool(matcher, tool) for tool in required_tools)
+            and match_tokens(claim.tokens, blob)
+        }
+    )
     # Synthesized config-backing strings never get the many-hits fallback: they must
     # match on a path, flag, or verb+noun, or not at all (zero-false-enforced).
     declarative = [
@@ -581,6 +600,16 @@ def _match_claim(
     return ClaimFinding(claim, status, backing=backing)
 
 
+def _claim_tool_lanes(claim: Claim) -> tuple[str, ...]:
+    """The tool lanes a blocking claim guard must cover to count as hook backing."""
+    text = claim.text.lower()
+    if re.search(r"\b(read|credential|secret|\.ssh|\.aws|\.gnupg)\b", text):
+        return ("Read", "Grep", "Bash")
+    if re.search(r"\b(write|edit|mutate|modify|config|settings|hooks)\b", text):
+        return ("Bash", "Edit", "Write")
+    return ("Bash",)
+
+
 # --- rendering -----------------------------------------------------------------------
 
 _STATUS_LABELS: dict[ClaimStatus, str] = {
@@ -589,6 +618,7 @@ _STATUS_LABELS: dict[ClaimStatus, str] = {
     ClaimStatus.ENFORCED_BOTH: "ENFORCED (both)",
     ClaimStatus.CANDIDATE_LOGIC: "CANDIDATE (logic)",
     ClaimStatus.PROSE_ONLY: "PROSE-ONLY",
+    ClaimStatus.UNKNOWN: "UNKNOWN",
     ClaimStatus.STYLE_RULE: "STYLE",
 }
 
