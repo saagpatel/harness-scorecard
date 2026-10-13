@@ -49,7 +49,7 @@ def grade_distribution(cards: list[Scorecard]) -> dict[Grade, int]:
 def _graded_dimensions(card: Scorecard) -> list[DimensionResult]:
     """Dimensions with at least one check that counts toward the grade.
 
-    A dimension that is all N/A, all waived, or only RUNTIME reports 0.00 but is excluded from
+    A dimension that is all N/A or all waived reports 0.00 but is excluded from
     the grade, so it must not be named the weakest.
     """
     return [dim for dim in card.dimensions if any(c.counts_toward_grade for c in dim.checks)]
@@ -65,7 +65,7 @@ def fleet_weakest_dimension(cards: list[Scorecard]) -> tuple[str, str, float] | 
     """The dimension with the lowest *average* score across the fleet: (id, name, avg).
 
     Each dimension is averaged only over the harnesses where it is graded (a dimension that is
-    all N/A, all waived, or RUNTIME-only for a harness is skipped rather than counted as 0.00),
+    all N/A or all waived for a harness is skipped rather than counted as 0.00),
     so averages can rest on different sample sizes. If that skew ever matters, weight by
     coverage here before calling the result "fleet-wide".
     """

@@ -12,12 +12,12 @@ plausible, otherwise-strong config that is *missing exactly one guard*; its `gua
 adds it back. The "attack" is described in prose in each `ATTACK.md`; the test demonstrates
 **detection**, never exploitation.
 
-## Phase 1 — the six capability gates
+## Phase 1 — the six current capability gates
 
 The gated checks are the ones that *cap* the grade no matter how good the rest of the harness
 is. Each pair isolates one gate:
 
-| Mode | Adapter | Gated check | Caps at | The one removed guard |
+| Mode | Adapter | Gated check | Caps at | The missing guard |
 |---|---|---|---|---|
 | [`claude-d1-credential-exposure`](claude-d1-credential-exposure/ATTACK.md) | Claude Code | `HS-D1-01` | **D** | `Read(...)` denies for `~/.ssh`/`~/.aws`/`~/.gnupg`/op/gcloud/`.env` |
 | [`claude-d4-inert-harddeny`](claude-d4-inert-harddeny/ATTACK.md) | Claude Code | `HS-D4-01` | **C** | a real PreToolUse git-safety hook (under bypass, `hard_deny` is inert) |

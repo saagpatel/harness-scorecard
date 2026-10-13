@@ -34,8 +34,6 @@ def _pending_dimension_ids(card: Scorecard) -> list[str]:
 
 def _check_line(check: CheckResult, *, explain: bool = False) -> list[str]:
     gate = f"  [GATE->{check.gate_cap.value}]" if check.is_gate and check.gate_cap else ""
-    if check.is_runtime:
-        gate += "  (RUNTIME, not graded)"
     tag = "WAIV" if check.waived else _STATUS_TAG[check.status]
     credited = ""
     if check.dispatcher_credited:
@@ -142,14 +140,9 @@ def render_console(card: Scorecard, *, explain: bool = False) -> str:
         # Distinguish a dimension excluded from the grade from one that genuinely scored 0.00.
         counting = [c for c in dim.checks if c.counts_toward_grade]
         all_waived = not counting and any(c.waived for c in dim.checks)
-        runtime_only = not counting and any(
-            c.is_runtime and c.status.score is not None for c in dim.checks
-        )
         excluded = ""
         if all_waived:
             excluded = "  (excluded: all findings waived)"
-        elif runtime_only:
-            excluded = "  (excluded: only RUNTIME checks, which are not graded)"
         out.append(f"  {dim.id}  {dim.name}    {dim.score:.2f}  [weight {dim.weight}]{excluded}")
         for check in dim.checks:
             out.extend(_check_line(check, explain=explain))
@@ -214,6 +207,13 @@ def render_json(card: Scorecard) -> str:
     return json.dumps(to_dict(card), indent=2)
 
 
+def _detectability_from_dict(value: str) -> Detectability:
+    """Read current detectability values; older runtime baselines remain static for diffing."""
+    if value == "runtime":
+        return Detectability.STATIC
+    return Detectability(value)
+
+
 def _check_from_dict(data: dict[str, Any], dimension_id: str) -> CheckResult:
     gate_cap = data.get("gate_cap")
     return CheckResult(
@@ -224,7 +224,9 @@ def _check_from_dict(data: dict[str, Any], dimension_id: str) -> CheckResult:
         weight=data["weight"],
         message=data.get("message", ""),
         severity=Severity(data.get("severity", Severity.MEDIUM.value)),
-        detectability=Detectability(data.get("detectability", Detectability.STATIC.value)),
+        detectability=_detectability_from_dict(
+            data.get("detectability", Detectability.STATIC.value)
+        ),
         is_gate=data.get("is_gate", False),
         gate_cap=Grade(gate_cap) if gate_cap else None,
         remediation=data.get("remediation", ""),

@@ -78,8 +78,7 @@ a static-analysis limit, not a missing guard" — so the grade is never misread 
 Material state that static files cannot resolve is reported as **UNKNOWN**, never promoted to
 PASS or quietly treated as FAIL. UNKNOWN checks remain visible in console, JSON, SARIF, HTML,
 summaries, and diffs, but are excluded from the numeric grade. Codex invocation flags and
-in-session model changes are one example: persistent routing layers can be graded; the active
-invocation cannot be reconstructed from configuration prose.
+in-session model changes cannot be reconstructed from static configuration.
 
 ## Proven, not asserted
 
@@ -374,7 +373,8 @@ to Claude Code's `bypassPermissions`. The rubric is versioned and emitted in eve
 
 ## Status
 
-Version 1.13.1 is published on PyPI and maintained. CI tests Python 3.12 through 3.15.
+Version 1.13.1 is published on PyPI and maintained. This change proposes package version 1.14.0.
+CI tests Python 3.12 through 3.15.
 
 ### Stack
 
@@ -412,7 +412,7 @@ For focused verification:
 
 ```bash
 # Choose the test file matching the behavior changed.
-uv run --no-sync python -m unittest discover -s tests -p 'test_checks_codex_cache.py'
+uv run --no-sync python -m unittest discover -s tests -p 'test_checks_codex_d6_d10.py'
 # Safe CLI smoke: static repository fixtures, not personal harness directories.
 uv run --no-sync harness-scorecard scan tests/fixtures/strong_harness --min-grade A
 ```

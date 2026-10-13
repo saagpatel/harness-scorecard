@@ -11,15 +11,6 @@ red-team rubric. This is the candidate backlog beyond 1.0 — ordered by leverag
 - **Codex trust-level discipline (D4)** — shipped as `CDX-D4-04` in 1.2.0. The
   check counts `[projects.*].trust_level = "trusted"` entries and reports broad
   trust surfaces as approval-floor erosion.
-- **GPT-5.6 routing discipline** — user/profile/trusted-project precedence, known model-effort
-  compatibility, explicit Max/Ultra gates, UNKNOWN semantics, and red-team score calibration now
-  land through `CDX-D7-03` / `CDX-D7-04`. A separate read-only maintainer monitor reports official
-  schema or installed model-catalog drift without changing the static grade.
-- **Cache-breakpoint hygiene** — `CDX-D7-05` grades declared GPT-5.6
-  `prompt_cache_options` / `prompt_cache_breakpoint` syntax on persistent Codex config.
-  Stable policy/rubric context must precede volatile project state, and cache-write cost must
-  be explicit. Unsupported, runtime-only, and ambiguous cases are UNKNOWN and stay out of
-  the score.
 
 ## Near-term
 
@@ -37,9 +28,6 @@ red-team rubric. This is the candidate backlog beyond 1.0 — ordered by leverag
 
 ## Longer-term / exploratory
 
-- **Opt-in runtime mode** — the rubric already tags RUNTIME-detectability signals and refuses to
-  fold them into a static grade. An explicit, sandboxed `--runtime` pass could confirm a few of
-  them (does the deny actually block?) and surface them as a separate, clearly-labeled section.
 - **Fleet view** — grade every harness on a machine (or across a team) and report the
   distribution, the weakest dimension org-wide, and drift over time.
 - **Rubric as a versioned spec** — publish `docs/rubric.md` as a citable, versioned standard so

@@ -1,4 +1,4 @@
-# Harness Scorecard Rubric (v1.6)
+# Harness Scorecard Rubric (v1.8.0)
 
 > The rubric **is** the product. It encodes real, documented red-team findings from
 > operating mature coding-agent harnesses into a set of statically-checkable signals,
@@ -31,8 +31,7 @@ For a **Codex** harness, the equivalent surface (sandbox, approval policy, trust
 **Not graded (out of scope for v1):** runtime behavior, the quality of agent *output*,
 general repository quality (that is a different subject — see
 `ai-harness-scorecard`, which grades repos), or anything requiring harness execution.
-Configuration checks grade what is **statically observable** by reading config; the
-repo-root receipt check additionally reads git state and a local SQLite database.
+Configuration checks grade what is **statically observable** by reading config.
 
 ## 2. Detectability model
 
@@ -41,10 +40,6 @@ Every check is tagged with how confidently config-reading can confirm it:
 - **STATIC** — the configured signal is statically detectable; runtime efficacy is not proven.
 - **PARTIAL** — presence is static, but *efficacy* or *coverage* is behavioral. The scorer
   credits presence and flags the residual uncertainty in the finding.
-- **RUNTIME** — only observable by executing the harness. **Never silently scored.** Surfaced
-  as an informational note, never folded into the grade.
-
-A scorer that pretends RUNTIME signals are STATIC is lying. We don't.
 
 ## 3. The effective-enforcement floor (the core insight)
 
@@ -295,11 +290,6 @@ harness shows in config. *Failure mode* = the documented incident it guards agai
   and `mcp__.*`. FM: can't reconstruct what an agent/injection did.
 - **HS-D10-02 — Failure & denial logging (2, STATIC)**: `PermissionDenied` /
   `PostToolUseFailure` / `StopFailure` log hooks. FM: silent failures leave no trail.
-- **HS-D10-03 — Peer-agent branch receipt discipline (1, RUNTIME)**: read-only git +
-  bridge-db lookup verifies any `codex/*` or `cc/*` branch with commits ahead of `main` has a
-  matching `activity_log.branch` receipt for the repo. FM: writing task shipped with no durable
-  proof receipt. This is suggest-only; it is not a capability gate. Informational only:
-  excluded from the grade (§2).
 
 ## 6. Codex adapter — same rubric, different guard surface
 
@@ -321,8 +311,6 @@ harness runs its own check suite (`HS-*` vs `CDX-*`) over the shared engine.
 | Env hygiene | `config.toml` → `[shell_environment_policy]` | Whether secret-named env vars reach subprocesses |
 | Active guards | `hooks.json` → `SessionStart`/`UserPromptSubmit`/`PreToolUse`/`PermissionRequest`/`PostToolUse`/`Stop` | Lifecycle scripts (same schema as Claude Code) |
 | Delegation | `config.toml` → `[agents]` (`max_threads`, `max_depth`, per-role `approval_policy`, `config_file`) | Subagent fan-out and governance |
-| Model routing | `config.toml`, `$CODEX_HOME/<name>.config.toml`, trusted project `.codex/config.toml` | Effective persistent model/effort/permission routes after user → profile → project precedence |
-| Prompt cache | `config.toml` → `prompt_cache_options`, `input[].content[].prompt_cache_breakpoint` | Declared GPT-5.6 explicit cache-write boundary (syntax only; not runtime cache hits) |
 | Behavioral contract | `AGENTS.md` / `AGENTS.override.md` | Documented operating rules |
 | History | `config.toml` → `[history].persistence`, `notify` | Audit trail and turn signalling |
 
@@ -333,13 +321,8 @@ exfiltrating actions run unchecked, and the gated checks compute against what re
 only). A `[projects."…"].trust_level = "trusted"` likewise lowers the floor by suppressing
 approval inside that directory.
 
-Routing checks resolve only persistent layers that static inspection can read. CLI flags,
-`--config`, `--profile` selection, and in-session `/model` or `/reasoning` changes have higher
-runtime precedence and are therefore disclosed as a caveat rather than guessed. Project config is
-counted only for projects marked trusted; untrusted projects do not activate project `.codex/`
-layers. Separate profile files are supported; stale `[profiles.*]` or top-level `profile` syntax
-is `UNKNOWN`, not credited. `default_permissions` and legacy sandbox keys are also `UNKNOWN` when
-combined, matching the official instruction not to combine those execution-control surfaces.
+CLI flags, `--config`, `--profile` selection, and in-session `/model` or `/reasoning` changes
+cannot be reconstructed from static files and are not part of this rubric's grade.
 
 **Codex gates** (same caps as Claude Code):
 
@@ -412,35 +395,12 @@ combined, matching the official instruction not to combine those execution-contr
 - **CDX-D6-01 — Stop-gate verifies completion (2, STATIC)**: a `Stop` verification hook.
 - **CDX-D6-02 — Independent verification agent (1, STATIC)**: a QA/closeout/review agent role.
 
-**D7 — Subagent governance and routing (weight 3).**
+**D7 — Subagent governance (weight 3).**
 - **CDX-D7-01 — Fan-out bounded (2, STATIC)**: explicit `max_threads` AND `max_depth` pass;
   one is PARTIAL. Both omitted are UNKNOWN because current official prose describes bounded
   defaults while the current official config schema says omitted `max_threads` is unlimited.
 - **CDX-D7-02 — No role bypasses approval (1, STATIC)**: no `[agents.*]` runs
   `approval_policy = "never"` (N/A when no roles are declared).
-- **CDX-D7-03 — Persistent reasoning routes are bounded (1, PARTIAL)**: resolves user defaults,
-  separate profile files, trusted-project overrides, and their combinations in documented
-  precedence order. Supported low/medium defaults and explicit high/xhigh profile/project lanes
-  pass; broad high/xhigh defaults are PARTIAL; implicit max/ultra defaults or project overrides
-  FAIL. Runtime-selected, stale, unsupported, or contradictory routes are UNKNOWN.
-- **CDX-D7-04 — Max and Ultra routes have explicit gates (1, PARTIAL)**: max/ultra must live in
-  a separately selected profile. Ultra additionally needs explicit `max_threads`/`max_depth` and
-  either read-only execution or a live approval gate. Guessed non-schema ultra markers are
-  UNKNOWN; the check is N/A when no max/ultra route exists, so absence earns no vacuous credit.
-  The vulnerable/guarded score effect is proven by
-  [`examples/redteam/codex-d7-routing`](../examples/redteam/codex-d7-routing/ATTACK.md).
-- **CDX-D7-05 — GPT-5.6 cache-breakpoint hygiene (1, PARTIAL)**: inspects persistent
-  `prompt_cache_options` / `prompt_cache_breakpoint` syntax only. PASS requires
-  `mode = "explicit"` and a breakpoint on the last stable developer content block before
-  volatile project/user state, so cache-write cost is accounted. A later user/tool/assistant
-  message may use plain-string `content` as that volatile suffix. Official
-  `prompt_cache_options.comparison_response_id` is an optional string diagnostic field and
-  does not change hygiene when well-typed; a non-string value is UNKNOWN. Implicit mode or a
-  prefix that includes project state FAILs. Unsupported markers, custom providers,
-  runtime-selected models, omitted input blocks, malformed breakpoint-bearing structures,
-  undocumented options fields, and GPT-5.6 routes with no declared syntax are UNKNOWN.
-  Earlier models with no cache fields are N/A. The check does not claim runtime cache hits;
-  UNKNOWN is excluded from the D7 denominator, so existing routing scores are unchanged.
 
 **D8 — Recovery (weight 2).** Codex has no PreCompact analog; the checks credit what its
 surface offers.
@@ -456,9 +416,6 @@ surface offers.
 - **CDX-D10-01 — Tool calls audit-logged (1, STATIC)**: a `PostToolUse` audit hook.
 - **CDX-D10-02 — Turn completion observable (1, STATIC)**: `notify` configured (PASS) or a
   `Stop` hook (PARTIAL).
-- **HS-D10-03 — Peer-agent branch receipt discipline (1, RUNTIME)**: shared with the Claude
-  suite because it checks repo proof receipts rather than Codex config syntax. Informational
-  only: excluded from the grade (§2).
 
 > **Static-analysis limit (opaque dispatcher pattern):** a harness that routes every hook through
 > one opaque dispatcher (e.g. `pre_tool_use_dispatch.py`) hides its security logic from
@@ -482,8 +439,11 @@ unredacted source text and paths. Scans do not send data off the machine.
 The rubric is versioned (`RUBRIC_VERSION`) and emitted in every report so a grade is
 reproducible against a known rubric. Adding/retiring checks, or changing which checks count
 toward the grade, bumps the version. Current
-rubric: **1.7.1**. Check IDs (`HS-Dn-nn` / `CDX-Dn-nn`) are stable and never reused.
+rubric: **1.8.0**. Check IDs (`HS-Dn-nn` / `CDX-Dn-nn`) are stable and never reused.
 
+Retired check IDs: `HS-D10-03`, `CDX-D7-03`, `CDX-D7-04`, and `CDX-D7-05` remain reserved.
+
+Rubric 1.8.0 removes private machine-specific checks without changing other weights or dimensions.
 Rubric 1.7.1 corrects false guard credits without new checks or weights: unknown
 Codex modes, inconsistent hook-lane matching, and missing skill provenance rules.
 Report output failures return exit 2 before console output; files are replaced

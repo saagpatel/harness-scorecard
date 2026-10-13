@@ -13,20 +13,14 @@ All notable changes to Harness Scorecard are documented here. The format follows
   and JSON output carries `old_rubric_version`, `new_rubric_version` and `rubric_changed`.
   A grade move may come from the rubric rather than the harness. Exit codes are unchanged.
 
-- **GPT-5.6 cache-breakpoint hygiene.** `CDX-D7-05` inspects persistent Codex configuration
-  for the official Responses API fields `prompt_cache_options.mode` (`explicit`/`implicit`),
-  `prompt_cache_options.ttl` (`30m`), optional string
-  `prompt_cache_options.comparison_response_id` (diagnostics only; ignored for hygiene
-  when well-typed), and content-block `prompt_cache_breakpoint: { mode =
-  "explicit" }` on `input_text` / `input_image` / `input_file`. PASS requires explicit
-  cache-write accounting and stable developer/policy context before volatile project/user
-  state. A later user/tool/assistant message may use plain-string `content` as that
-  volatile suffix. Implicit writes, unofficial `cache_control` / `prompt_cache_retention`
-  markers, custom providers, runtime-selected models, malformed breakpoint-bearing
-  structures, and omitted syntax are UNKNOWN (or FAIL when the declared official syntax
-  hides writes or inverts prefix order). The check does not claim runtime cache hits.
-  Rubric 1.6.0; existing D7 scores stay unchanged because UNKNOWN and N/A are excluded
-  from the denominator.
+
+### Removed
+
+- **HS-D10-03, CDX-D7-03, CDX-D7-04, and CDX-D7-05 are retired.** The package no longer
+  reads the private `bridge-db` database, has a RUNTIME detectability class, or includes the
+  `codex_routing_facts` monitor. Their JSON, SARIF, console, and HTML results are removed;
+  Codex grades can rise or fall as the routing and prompt-cache checks leave scoring.
+  Rubric version is 1.8.0. Proposed package version: 1.14.0.
 
 ### Fixed
 

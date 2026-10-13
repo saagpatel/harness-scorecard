@@ -52,7 +52,7 @@ def _scores(checks: list[CheckResult]) -> list[tuple[int, float]]:
 
 
 def _weighted_score(checks: list[CheckResult]) -> float:
-    """Weighted average of counting check scores (N/A, waived and RUNTIME checks excluded)."""
+    """Weighted average of counting check scores (N/A and waived checks excluded)."""
     scored = _scores(checks)
     total_weight = sum(weight for weight, _ in scored)
     if total_weight == 0:
@@ -82,8 +82,8 @@ def _apply_policy(results: list[CheckResult], policy: Policy) -> list[str]:
     """Apply an operator policy in place. Returns transparency notes for the report.
 
     Dispatcher credits run first (FAIL -> PARTIAL), then waivers exclude any remaining non-PASS
-    finding. Both surface a note when they target a check that passes, is RUNTIME (never graded),
-    or doesn't exist, so a stale policy entry is visible rather than silently inert.
+    finding. Both surface a note when they target a check that passes or doesn't exist, so a
+    stale policy entry is visible rather than silently inert.
     """
     by_id = {result.id: result for result in results}
     return [
@@ -98,10 +98,6 @@ def _apply_credits(by_id: Mapping[str, CheckResult], credited_ids: Sequence[str]
         result = by_id.get(check_id)
         if result is None:
             notes.append(f"dispatcher credit for unknown check {check_id} (ignored)")
-        elif result.is_runtime:
-            notes.append(
-                f"dispatcher credit for {check_id} is unnecessary (RUNTIME checks are never graded)"
-            )
         elif result.status is Status.FAIL:
             result.status = Status.PARTIAL
             result.dispatcher_credited = True
@@ -119,8 +115,6 @@ def _apply_waivers(by_id: Mapping[str, CheckResult], waivers: Mapping[str, str])
         result = by_id.get(check_id)
         if result is None:
             notes.append(f"waiver for unknown check {check_id} (ignored)")
-        elif result.is_runtime:
-            notes.append(f"waiver for {check_id} is unnecessary (RUNTIME checks are never graded)")
         elif result.status is Status.PASS:
             notes.append(f"waiver for {check_id} is unnecessary (check passes)")
         elif result.status is Status.NOT_APPLICABLE:
@@ -150,7 +144,7 @@ def _apply_detection(
     notes: list[str] = []
     for check_id, evidence in detected.items():
         result = by_id.get(check_id)
-        if result is None or result.waived or result.is_runtime or result.status is not Status.FAIL:
+        if result is None or result.waived or result.status is not Status.FAIL:
             continue
         if credit and not result.is_gate:
             result.status = Status.PARTIAL
