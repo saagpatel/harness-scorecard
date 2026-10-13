@@ -72,7 +72,7 @@ class TestInputErrors(unittest.TestCase):
                     (root / name).unlink()
                     (root / marker).unlink()
 
-    def test_base_toml_errors_raise_but_profile_caveats_remain(self):
+    def test_base_toml_errors_raise(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             path = root / "config.toml"
@@ -87,8 +87,6 @@ class TestInputErrors(unittest.TestCase):
             path.write_text("")
             with patch.object(Path, "open", side_effect=PermissionError("denied")):
                 self.assert_input_error(path, lambda _: load_codex_harness(root))
-            (root / "review.config.toml").write_text("invalid = =")
-            self.assertTrue(any(route.issues for route in load_codex_harness(root).routing_routes))
 
     def test_bad_group_hooks_are_skipped(self):
         for value in (None, "command", {}):

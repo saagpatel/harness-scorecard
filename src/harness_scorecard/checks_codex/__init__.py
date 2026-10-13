@@ -9,13 +9,11 @@ from __future__ import annotations
 
 from harness_scorecard.checks.base import Check
 from harness_scorecard.checks_codex import (
-    cache,
     destructive_git,
     egress,
     observability,
     provenance,
     recovery,
-    routing,
     secret_protection,
     self_protection,
     subagent_isolation,
@@ -33,8 +31,6 @@ CODEX_CHECKS: list[Check[CodexConfig]] = [
     *self_protection.CHECKS,
     *verification.CHECKS,
     *subagent_isolation.CHECKS,
-    *routing.CHECKS,
-    *cache.CHECKS,
     *recovery.CHECKS,
     *provenance.CHECKS,
     *observability.CHECKS,

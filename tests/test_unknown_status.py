@@ -19,9 +19,9 @@ from harness_scorecard.summary import render_github_summary
 
 def _card() -> Scorecard:
     check = CheckResult(
-        id="CDX-D7-03",
-        dimension="D7",
-        title="Persistent reasoning routes are bounded",
+        id="CDX-D6-01",
+        dimension="D6",
+        title="Stop-gate verifies completion",
         status=Status.UNKNOWN,
         weight=1,
         message="The active invocation cannot be proven from static files.",
@@ -52,7 +52,7 @@ class TestUnknownOutputContracts(unittest.TestCase):
         card = _card()
         console = render_console(card)
         data = to_dict(card)
-        self.assertIn("[UNKN] CDX-D7-03", console)
+        self.assertIn("[UNKN] CDX-D6-01", console)
         self.assertIn("Unknown checks excluded from the grade: 1", console)
         self.assertEqual(data["dimensions"][0]["checks"][0]["status"], "unknown")
         self.assertEqual(from_dict(data).dimensions[0].checks[0].status, Status.UNKNOWN)

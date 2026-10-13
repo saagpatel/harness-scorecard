@@ -158,10 +158,6 @@ FAILURE_MODES: dict[str, str] = {
         "Silent failures and denials leave no trail, because there are no PermissionDenied / "
         "PostToolUseFailure / StopFailure log hooks."
     ),
-    "HS-D10-03": (
-        "A peer-agent branch carries commits ahead of main, but no bridge-db activity row names "
-        "that branch, so the writing task has no durable proof receipt."
-    ),
     # --- Codex (CDX-*) -------------------------------------------------------------------------
     # D1 — Secret protection
     "CDX-D1-01": (
@@ -252,22 +248,6 @@ FAILURE_MODES: dict[str, str] = {
     "CDX-D7-02": (
         "A subagent role runs approval_policy = never, bypassing the human gate for everything it "
         "does even when the top-level policy is stricter."
-    ),
-    "CDX-D7-03": (
-        "A broad persistent route silently makes ordinary tasks inherit high-cost reasoning, or "
-        "a stale/unsupported model-effort pair receives credit despite having no verified runtime "
-        "meaning. Task-specific profiles are explicit; prose and ambiguous catalog state are not."
-    ),
-    "CDX-D7-04": (
-        "Max or Ultra loads implicitly for ordinary work, or Ultra can auto-delegate without "
-        "explicit fan-out and execution gates. A guessed ultra marker can also look disciplined "
-        "to a text scanner while being inert configuration."
-    ),
-    "CDX-D7-05": (
-        "GPT-5.6 cache writes charge 1.25x ordinary input. Implicit or undeclared breakpoints "
-        "write through volatile project state, or a breakpoint is placed before stable "
-        "policy/rubric context, so cache-write cost is hidden and the reusable prefix is the "
-        "wrong slice. Static inspection cannot prove runtime hits."
     ),
     # D8 — Recovery
     "CDX-D8-01": (
