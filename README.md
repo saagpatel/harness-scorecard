@@ -374,20 +374,29 @@ to Claude Code's `bypassPermissions`. The rubric is versioned and emitted in eve
 
 ## Development
 
-Run these commands from the repository root with `uv` and Python 3.12 available
-(`.python-version` pins 3.12; the package requires Python >=3.12). `uv sync --frozen`
-creates the local `.venv` and installs the locked development tools; its first run
-may need network access to download Python/packages. Do not refresh the lockfile
-just to verify a change.
+Use **uv 0.12.12** from the repository root. `.python-version` pins managed
+**Python 3.14.7** for development; the package keeps its **Python >=3.12** floor.
+With that uv version on `PATH`, a fresh clone reaches the full local gate with:
 
 ```bash
-uv sync --frozen
-# Focused example: choose the test file matching the behavior changed.
+make setup && make check
+```
+
+`make setup` creates `.venv` with `uv sync --locked`; stale lockfiles fail rather
+than resolve implicitly. The first run may need network access for Python and
+packages. Do not refresh the lockfile just to verify a change. `make check` is
+the aggregate gate used by CI: lock freshness, Ruff format and lint checks,
+`ty` on `src/` only, and unittest under branch coverage. The measured baseline
+is **92.33%**, with a **90.33%** floor. Dev tools are pinned to the existing lock:
+Ruff 0.15.20, ty 0.0.55, pytest 9.1.1, and pytest-cov 7.1.0; unittest remains
+the test runner. CI covers Python 3.12, 3.13, 3.14, and 3.15 on Ubuntu with
+`fail-fast: false`; uv 0.12.12's managed 3.15.0rc2 lane is allowed to fail.
+
+For focused verification:
+
+```bash
+# Choose the test file matching the behavior changed.
 uv run --no-sync python -m unittest discover -s tests -p 'test_checks_codex_cache.py'
-# Broader checks used by .github/workflows/ci.yml:
-uv run --no-sync python -m unittest discover -s tests
-uv run --no-sync ruff check src/ tests/
-uv run --no-sync ty check src/
 # Safe CLI smoke: static repository fixtures, not personal harness directories.
 uv run --no-sync harness-scorecard scan tests/fixtures/strong_harness --min-grade A
 ```
@@ -397,9 +406,9 @@ Use the explicit fixture path for verification rather than `~/.claude`, `~/.code
 or machine-wide `fleet` scans. A grade below `--min-grade` exits 1; invalid input
 exits 2.
 
-For Python formatting changes, `uv run --no-sync ruff format --check src/ tests/`
-checks without rewriting files (formatting is not currently a CI gate). For
-packaging changes, `uv build` creates the wheel and source distribution in `dist/`;
+`make check` does not rewrite source or sync dependencies; it writes only local
+check artifacts. `make test` runs the coverage suite and enforces its floor. For
+packaging changes, `make build` creates the wheel and source distribution in `dist/`;
 this is a local build, not a release. Publishing is a separate operation covered
 by [the release checklist](docs/RELEASE.md).
 
