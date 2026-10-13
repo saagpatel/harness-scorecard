@@ -25,7 +25,8 @@ class TestD9OnFixtures(unittest.TestCase):
 class TestD901SkillInstallGate(unittest.TestCase):
     def test_gate_on_both_channels_passes(self):
         config = make_config(
-            hooks=[HookEntry("PreToolUse", "Edit|Write", "/h/skill-install-gate.sh")]
+            hooks=[HookEntry("PreToolUse", "Edit|Write", "/h/skill-install-gate.sh")],
+            rule_files=["skill-provenance.md"],
         )
         self.assertEqual(get_check("HS-D9-01").run(config).status, Status.PASS)
 
