@@ -7,12 +7,16 @@ the softest-fitting dimension for Codex; the checks credit what its surface actu
 
 from __future__ import annotations
 
-from harness_scorecard.checks.base import Check, CheckOutcome, failed, passed
+from harness_scorecard.checks.base import Check, CheckOutcome, failed, passed, unknown
 from harness_scorecard.discovery_codex import CodexConfig
 from harness_scorecard.models import Detectability, Severity
 
 
 def _sandbox_confines_changes(config: CodexConfig) -> CheckOutcome:
+    if not config.sandbox_recognized:
+        return unknown(
+            f"Cannot resolve recovery boundary for sandbox/profile {config.sandbox_mode!r}."
+        )
     if config.sandbox_disabled:
         return failed(
             "danger-full-access lets the agent write anywhere; changes are not confined for "
