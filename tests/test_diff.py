@@ -13,6 +13,7 @@ from harness_scorecard.diff import (
 )
 from harness_scorecard.models import (
     CheckResult,
+    Detectability,
     DimensionResult,
     Grade,
     Scorecard,
@@ -176,6 +177,41 @@ class TestJsonRoundTrip(unittest.TestCase):
         # required keys -> clean ValueError, not a raw KeyError/TypeError.
         with self.assertRaises(ValueError):
             from_dict({"dimensions": [{"id": "D1"}], "grade": "B"})
+
+    def test_diff_accepts_old_runtime_baseline_for_retired_check(self) -> None:
+        old_card = _card(
+            Grade.B,
+            0.82,
+            [
+                _dim(
+                    "D10",
+                    0.5,
+                    [
+                        _check("HS-D10-03", "D10", Status.FAIL),
+                        _check("HS-D10-01", "D10", Status.PASS),
+                    ],
+                )
+            ],
+            rubric_version="1.7.1",
+        )
+        baseline = to_dict(old_card)
+        baseline["dimensions"][0]["checks"][0]["detectability"] = "runtime"
+        restored = from_dict(baseline)
+        self.assertIs(restored.dimensions[0].checks[0].detectability, Detectability.STATIC)
+
+        current = _card(
+            Grade.B,
+            0.82,
+            [_dim("D10", 1.0, [_check("HS-D10-01", "D10", Status.PASS)])],
+            rubric_version="1.8.0",
+        )
+        delta = next(
+            item
+            for item in diff_scorecards(restored, current).check_deltas
+            if item.id == "HS-D10-03"
+        )
+        self.assertEqual(delta.old_status, Status.FAIL)
+        self.assertIsNone(delta.new_status)
 
 
 class TestDiffRender(unittest.TestCase):
