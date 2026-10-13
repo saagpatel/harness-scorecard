@@ -33,7 +33,7 @@ outputs:
     description: Path to the generated SARIF report.
     value: ${{ inputs.sarif-file }}
   exit-code:
-    description: Raw scan exit code (0 = meets bar, 1 = below bar, 2 = no harness found).
+    description: Raw scan exit code (0 = meets bar, 1 = below bar, 2 = invalid input or report-write failure).
     value: ${{ steps.scan.outputs.exit-code }}
   diff-exit-code:
     description: Raw diff exit code when a baseline is set (0 = no regression, 1 = regressed, 2 = invalid input).
@@ -70,7 +70,7 @@ runs:
         exit 0
 
     - name: Upload SARIF to code scanning
-      if: ${{ inputs.upload-sarif == 'true' && steps.scan.outputs.exit-code != '2' }}
+      if: ${{ inputs.upload-sarif == 'true' && (steps.scan.outputs.exit-code == '0' || steps.scan.outputs.exit-code == '1') }}
       uses: github/codeql-action/upload-sarif@54f647b7e1bb85c95cddabcd46b0c578ec92bc1a # v4
       with:
         sarif_file: ${{ inputs.sarif-file }}
@@ -113,6 +113,10 @@ runs:
           printf 'minimum grade: %s\n' "$HS_MIN_GRADE"
           exit 1
         fi
+        if [ "$SCAN_CODE" != "0" ]; then
+          echo "::error::harness-scorecard exited with unexpected code $SCAN_CODE (crash or interrupt), not a grade result"
+          exit 1
+        fi
         if [ -n "$HS_BASELINE" ]; then
           if [ -z "$DIFF_CODE" ]; then
             echo "::error::Baseline comparison produced no exit code; the diff step failed."
@@ -126,6 +130,10 @@ runs:
           if [ "$DIFF_CODE" = "1" ]; then
             echo "::error::Harness grade regressed below the committed baseline."
             printf 'baseline: %s\n' "$HS_BASELINE"
+            exit 1
+          fi
+          if [ "$DIFF_CODE" != "0" ]; then
+            echo "::error::harness-scorecard exited with unexpected code $DIFF_CODE (crash or interrupt), not a grade result"
             exit 1
           fi
           printf 'No grade regression vs baseline (%s).\n' "$HS_BASELINE"

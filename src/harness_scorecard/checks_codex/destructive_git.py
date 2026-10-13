@@ -15,6 +15,7 @@ from harness_scorecard.checks.base import (
     not_applicable,
     partial,
     passed,
+    unknown,
 )
 from harness_scorecard.discovery_codex import APPROVAL_NEVER, CodexConfig
 from harness_scorecard.models import Detectability, Grade, Severity
@@ -42,20 +43,29 @@ def _has_bash_git_guard(config: CodexConfig) -> bool:
 
 def _destructive_floor(config: CodexConfig) -> CheckOutcome:
     sources: list[str] = []
-    if not config.approval_disabled:
+    if config.approval_recognized and not config.approval_disabled:
         # Still a defense-in-depth layer, but a discretionary one is labeled so the
         # evidence never overstates it as a deterministic gate.
         qualifier = (
             "" if config.approval_policy in _DETERMINISTIC_APPROVALS else " (model-discretionary)"
         )
         sources.append(f"approval_policy={config.approval_policy}{qualifier}")
-    if not config.sandbox_disabled:
+    if config.sandbox_recognized and not config.sandbox_disabled:
         sources.append(f"sandbox_mode={config.sandbox_mode}")
     if _has_bash_git_guard(config):
         sources.append("hook:bash-git-safety")
 
     if len(sources) >= 2:  # noqa: PLR2004 - two independent layers = defense in depth
         return passed("Destructive actions are gated by multiple independent layers.", sources)
+    unresolved = []
+    if not config.approval_recognized:
+        unresolved.append(f"approval_policy={config.approval_policy!r}")
+    if not config.sandbox_recognized:
+        unresolved.append(f"sandbox_mode={config.sandbox_mode!r}")
+    if unresolved:
+        return unknown(
+            "Cannot confirm destructive-action protection: " + ", ".join(unresolved), sources
+        )
     if len(sources) == 1:
         return partial("Destructive actions rest on a single layer; add defense in depth.", sources)
     return failed(

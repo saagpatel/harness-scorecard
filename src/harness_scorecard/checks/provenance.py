@@ -11,8 +11,17 @@ def _check_skill_install_gate(config: HarnessConfig) -> CheckOutcome:
     # Both Write (create/replace) and Edit (patch) can clobber a skill, so both must be gated.
     has_write = config.has_hook("PreToolUse", "skill-install", matcher="Write")
     has_edit = config.has_hook("PreToolUse", "skill-install", matcher="Edit")
+    has_rule = any("provenance" in name.lower() for name in config.rule_files) or any(
+        "skill-provenance" in hook.command for hook in config.hooks
+    )
     if has_write and has_edit:
-        return passed("A skill-install gate guards both the Write and Edit channels.")
+        if has_rule:
+            return passed(
+                "A skill-install gate guards Write and Edit with declared provenance, not verified."
+            )
+        return partial(
+            "The skill-install gate guards Write and Edit, but no provenance rule is declared."
+        )
     if has_write or has_edit:
         covered = "Write" if has_write else "Edit"
         return partial(f"The skill-install gate covers only the {covered} channel.")

@@ -25,12 +25,23 @@ class HookEntry:
     command: str
 
 
+class HarnessInputError(ValueError):
+    """A present harness configuration cannot be safely interpreted."""
+
+
 def read_json(path: Path) -> dict[str, Any]:
-    """Parse a JSON file to a dict, degrading to ``{}`` on any read/parse error."""
+    """Read an object config; only an absent file defaults to an empty object."""
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError):
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError:
         return {}
+    except (ValueError, OSError) as exc:
+        message = f"Cannot read {path}: invalid or unreadable JSON."
+        raise HarnessInputError(message) from exc
+    if not isinstance(value, dict):
+        message = f"Cannot read {path}: JSON root must be an object."
+        raise HarnessInputError(message)
+    return value
 
 
 def as_dict(value: Any) -> dict[str, Any]:
@@ -59,7 +70,10 @@ def flatten_hooks(hooks_section: Any) -> list[HookEntry]:
             if not isinstance(group, dict):
                 continue
             matcher = str(group.get("matcher", ""))
-            for hook in group.get("hooks", []):
+            hooks = group.get("hooks", [])
+            if not isinstance(hooks, list):
+                continue
+            for hook in hooks:
                 if isinstance(hook, dict) and "command" in hook:
                     entries.append(  # noqa: PERF401 - guarded nested build reads clearer as a loop
                         HookEntry(str(event), matcher, str(hook["command"]))
@@ -68,20 +82,24 @@ def flatten_hooks(hooks_section: Any) -> list[HookEntry]:
 
 
 def matcher_covers(registered: str, wanted: str | None) -> bool:
-    """Whether a registered matcher covers a wanted lane (substring or universal)."""
-    if wanted is None:
+    """Whether a registered regex matches the wanted tool lane."""
+    if wanted is not None:
+        return matcher_matches_tool(registered, wanted)
+    # A lane-agnostic query still must not credit a malformed matcher.
+    if registered.strip() in ("", "*"):
         return True
-    registered = registered.strip()
-    if registered in ("", "*"):
-        return True
-    return wanted.lower() in registered.lower()
+    try:
+        re.compile(registered.strip())
+    except re.error:
+        return False
+    return True
 
 
 def matcher_matches_tool(matcher: str, tool_name: str) -> bool:
     """Whether a single matcher (a regex) matches a concrete tool name.
 
-    A universal matcher (empty / ``*``) matches everything; an invalid regex falls back to a
-    substring test.
+    A universal matcher (empty / ``*``) matches everything; an invalid regex matches nothing.
+    Tool names are case-sensitive. Search semantics deliberately do not imply anchoring.
     """
     matcher = matcher.strip()
     if matcher in ("", "*"):
@@ -89,7 +107,7 @@ def matcher_matches_tool(matcher: str, tool_name: str) -> bool:
     try:
         return re.search(matcher, tool_name) is not None
     except re.error:
-        return matcher.lower() in tool_name.lower()
+        return False
 
 
 def hook_present(

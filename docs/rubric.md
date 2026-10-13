@@ -91,6 +91,16 @@ surfaces, and other cases where assigning a numeric value would overstate what s
 proves. JSON emits `"status": "unknown"`; console/HTML/summary render it explicitly; SARIF emits
 an informational `note`. Badges and exit codes continue to reflect the scored grade only.
 
+Malformed or unreadable base harness files (`settings.json`, `settings.local.json`,
+`hooks.json`, `config.toml`) are invalid input, not an empty harness: CLI scans return
+exit 2 with an error. Absent files retain defaults; optional Codex profile/project
+TOML layers retain UNKNOWN caveats. Unrecognized approval and sandbox values cannot
+supply protective layers for CDX-D4-01 / CDX-D5-01; insufficient known protection is
+UNKNOWN unless a known exposure already establishes FAIL.
+
+Hook tool lanes use case-sensitive regex search consistently. Empty and `*` matchers
+are universal; invalid regexes match nothing. Regex search is not implicitly anchored.
+
 ### 4.2 Per-check weight
 
 Each check carries a weight (1–5) reflecting how badly its failure mode hurts. A failed
@@ -273,7 +283,9 @@ harness shows in config. *Failure mode* = the documented incident it guards agai
 
 - **HS-D9-01 — Skill-install provenance gate (3, STATIC)**: PreToolUse Write/Edit
   skill-install guard + a provenance rule. FM: a skill pack silently clobbers a user skill.
-  Known gap: the scorer currently checks a PreToolUse `skill-install` guard on both Write and Edit; a provenance rule is not checked.
+  PASS requires both lanes plus a `rules/` filename containing `provenance` or a hook
+  command containing `skill-provenance`. Both lanes without that declaration, or a
+  single guarded lane, are PARTIAL; no gate is FAIL. Provenance is declared, not verified.
 - **HS-D9-02 — Skill-catalog injection bounds (2, STATIC)**: `skillListingBudgetFraction`
   and `maxSkillDescriptionChars` set. FM: re-injecting the full skill catalog blows context.
 
@@ -470,4 +482,12 @@ unredacted source text and paths. Scans do not send data off the machine.
 The rubric is versioned (`RUBRIC_VERSION`) and emitted in every report so a grade is
 reproducible against a known rubric. Adding/retiring checks, or changing which checks count
 toward the grade, bumps the version. Current
-rubric: **1.7.0**. Check IDs (`HS-Dn-nn` / `CDX-Dn-nn`) are stable and never reused.
+rubric: **1.7.1**. Check IDs (`HS-Dn-nn` / `CDX-Dn-nn`) are stable and never reused.
+
+Rubric 1.7.1 corrects false guard credits without new checks or weights: unknown
+Codex modes, inconsistent hook-lane matching, and missing skill provenance rules.
+Report output failures return exit 2 before console output; files are replaced
+atomically per report, while summaries remain append-only. Multiple outputs are
+not a transaction: a later replacement or summary failure may leave earlier
+reports written. Action crashes and interrupts fail enforcement; only scan codes
+0 and 1 upload SARIF. These delivery fixes do not reshape scoring.

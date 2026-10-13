@@ -9,7 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import StrEnum
 
-RUBRIC_VERSION = "1.7.0"
+RUBRIC_VERSION = "1.7.1"
 
 
 class Status(StrEnum):

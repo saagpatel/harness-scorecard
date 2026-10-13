@@ -88,12 +88,11 @@ class TestLoadContract(unittest.TestCase):
         self.assertEqual(config.sandbox_mode, "read-only")
         self.assertTrue(config.network_blocked)
 
-    def test_malformed_toml_degrades_without_crashing(self) -> None:
+    def test_malformed_base_toml_raises(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             (Path(tmp) / "config.toml").write_text("this is = = not valid toml", encoding="utf-8")
-            config = load_codex_harness(tmp)
-        self.assertEqual(config.raw_config, {})
-        self.assertEqual(config.sandbox_mode, "read-only")
+            with self.assertRaises(ValueError):
+                load_codex_harness(tmp)
 
     def test_env_set_with_secret_name_defeats_scrubbing(self) -> None:
         # inherit="none" scrubs inherited env, but an explicit secret-named set still leaks.
