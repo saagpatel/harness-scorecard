@@ -22,6 +22,7 @@ from typing import Any
 from harness_scorecard.caveats import detect_dispatcher_caveats
 from harness_scorecard.codex_cache import CodexCacheDeclaration, parse_cache_declaration
 from harness_scorecard.parsing import (
+    HarnessInputError,
     HookEntry,
     event_present,
     hook_on_tool,
@@ -132,6 +133,20 @@ class CodexConfig:
     # --- effective-floor helpers (the bypass-aware moat for Codex) -----------------
 
     @property
+    def approval_recognized(self) -> bool:
+        return self.approval_policy in (
+            "untrusted",
+            "on-failure",
+            "on-request",
+            "never",
+            "granular",
+        )
+
+    @property
+    def sandbox_recognized(self) -> bool:
+        return self.sandbox_mode in (SANDBOX_READ_ONLY, SANDBOX_WORKSPACE_WRITE, SANDBOX_DANGER)
+
+    @property
     def sandbox_disabled(self) -> bool:
         """``danger-full-access`` removes the filesystem sandbox entirely."""
         return self.sandbox_mode == SANDBOX_DANGER
@@ -220,7 +235,7 @@ def _read_toml_layer(path: Path) -> tuple[dict[str, Any], str | None]:
             return tomllib.load(handle), None
     except FileNotFoundError:
         return {}, None
-    except tomllib.TOMLDecodeError:
+    except (tomllib.TOMLDecodeError, UnicodeDecodeError):
         return {}, f"Cannot resolve routing layer {path}: invalid TOML."
     except OSError:
         return {}, f"Cannot resolve routing layer {path}: unreadable."
@@ -414,14 +429,14 @@ def load_codex_harness(root: Path | str) -> CodexConfig:
         raise FileNotFoundError(msg)
 
     raw, base_error = _read_toml_layer(config_path)
+    if base_error:
+        raise HarnessInputError(base_error)
     sandbox_write = _as_dict(raw.get("sandbox_workspace_write"))
     env_policy = _as_dict(raw.get("shell_environment_policy"))
     history = _as_dict(raw.get("history"))
     agents, max_threads, max_depth = _parse_agents(raw)
 
     routes, routing_issues = _routing_routes(root, raw)
-    if base_error:
-        routing_issues.append(base_error)
     return CodexConfig(
         root=root,
         harness_type=HARNESS_TYPE_CODEX,
