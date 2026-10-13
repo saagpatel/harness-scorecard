@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from harness_scorecard.checks.base import Check, CheckOutcome, failed, partial, passed
-from harness_scorecard.checks.receipt_discipline import RECEIPT_DISCIPLINE_CHECK
 from harness_scorecard.discovery import HarnessConfig
 from harness_scorecard.models import Severity
 
@@ -68,5 +67,4 @@ CHECKS: list[Check] = [
         severity=Severity.LOW,
         remediation="Add PermissionDenied, PostToolUseFailure, and StopFailure log hooks.",
     ),
-    RECEIPT_DISCIPLINE_CHECK,
 ]
