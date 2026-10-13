@@ -136,8 +136,7 @@ def _unresolved_block_issue(block: CodexCacheBlock) -> str | None:
         return "content block role or type cannot be classified as policy vs project state"
     if block.content_type not in SUPPORTED_CONTENT_TYPES:
         return (
-            f"content type {block.content_type!r} is outside the GPT-5.6 "
-            "cache-breakpoint contract"
+            f"content type {block.content_type!r} is outside the GPT-5.6 cache-breakpoint contract"
         )
     return None
 
@@ -214,9 +213,7 @@ def _prefix_hygiene_issue(
     return None
 
 
-def _ordering_outcome(
-    blocks: tuple[CodexCacheBlock, ...], evidence: list[str]
-) -> CheckOutcome:
+def _ordering_outcome(blocks: tuple[CodexCacheBlock, ...], evidence: list[str]) -> CheckOutcome:
     block_evidence = evidence + [_block_evidence(block) for block in blocks]
     classified, issue = _classify_blocks(blocks)
     if issue is not None or classified is None:
@@ -234,9 +231,7 @@ def _ordering_outcome(
     return unknown(message, block_evidence)
 
 
-def _declared_explicit_outcome(
-    cache: CodexCacheDeclaration, evidence: list[str]
-) -> CheckOutcome:
+def _declared_explicit_outcome(cache: CodexCacheDeclaration, evidence: list[str]) -> CheckOutcome:
     if cache.mode is None:
         return failed(
             "prompt_cache_options.mode is omitted, so GPT-5.6 implicit cache writes through "
@@ -291,9 +286,7 @@ def _surface_unknown(route: CodexRoutingRoute, evidence: list[str]) -> CheckOutc
     return None
 
 
-def _applicability_outcome(
-    route: CodexRoutingRoute, evidence: list[str]
-) -> CheckOutcome | None:
+def _applicability_outcome(route: CodexRoutingRoute, evidence: list[str]) -> CheckOutcome | None:
     model = _normalize(route.model)
     cache = route.cache
     if _is_gpt56(model):
