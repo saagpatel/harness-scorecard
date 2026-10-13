@@ -1,43 +1,40 @@
-<!-- portfolio-context:start -->
-# Portfolio Context
+# Purpose
 
-## What This Project Is
+Harness Scorecard is a read-only linter and A–F maturity grader for Claude Code
+and Codex harnesses. The runtime is Python stdlib-only, with a Python 3.12 floor.
 
-harness-scorecard: A read-only linter and **A–F maturity grader for coding-agent harnesses**. Point it at a Claude Code or Codex harness directory.
+## Layout
 
-## Current State
+- `src/harness_scorecard/`: discovery, checks, scoring, CLI, and report renderers.
+- `tests/`: unittest suite and inert harness fixtures.
+- `examples/`: sample harnesses and red-team fixture pairs.
+- `docs/`: rubric, release checklist, and supporting contracts.
+- `.github/workflows/`: CI and publishing; follow its local `AGENTS.md` too.
 
-Portfolio truth currently marks this project as `active` with `boilerplate` context. Phase 104 recovered minimum-viable context so future sessions can resume without rediscovery.
+## Setup
 
-## Stack
+Use uv 0.13.0; `.python-version` pins managed Python 3.14.7 for development.
+From the repository root, run `make setup` to install locked dependencies.
+Never refresh the lockfile just to verify a change.
 
-- Primary stack: Python
+## Checks
 
-## How To Run
+Run `make check` for lock freshness, formatting, lint, source-only types, and
+the unittest suite with branch coverage (90.33% minimum). `make test` runs only
+the coverage tests. CI covers Python 3.12–3.15, all required. Keep tests on unittest and type-check only `src/`.
 
-For development setup, fixture-only verification, focused tests, lint/type checks,
-and conditional report/browser checks, use [README Development](README.md#development).
-The examples below are user-invoked audits, not the development smoke test.
+For a safe CLI smoke, run:
 
 ```bash
-# Grade a harness directory (e.g. your ~/.claude)
-harness-scorecard scan ~/.claude
-
-# JSON for tooling, plus a self-contained HTML scorecard
-harness-scorecard scan ~/.claude --format json --html scorecard.html
-
-# SARIF 2.1.0 for CI / GitHub code scanning, failing the run below grade C
-harness-scorecard scan ~/.claude --sarif harness.sarif --min-grade C
+uv run --no-sync harness-scorecard scan tests/fixtures/strong_harness --min-grade A
 ```
 
-`--min-grade {A,B,C,D,F}` sets the bar (default `B`). Exit codes: `0` meets the bar ·
-`1` below the bar · `2` invalid input (including no harness found).
+Fixtures do not execute hooks or connect to providers. Use repository fixtures
+for verification, not personal harness directories or machine-wide fleet scans.
+For HTML/report changes, follow the conditional browser checks in
+[README Development](README.md#development).
 
-## Known Risks
-
-- This repo only has minimum-viable recovery context today; deeper handoff details may still live in the README and supporting docs.
-
-## Review guidelines
+## Boundaries
 
 Focus Codex review on read-only enforcement, claim/backing correctness, hook
 phase and matcher semantics, path-boundary matching, SARIF and JSON output
@@ -52,12 +49,20 @@ release instructions must stay aligned with code and workflows. A docs or
 workflow change that alters the trusted-publisher claim, `id-token` boundary,
 tag trigger, or consumer-facing output shape is merge-relevant.
 
+For `publish.yml`, keep `id-token: write` scoped to the publish job and guarded
+by the `pypi` environment. Keep the semver release-tag trigger and release docs
+aligned with the PyPI trusted-publisher fields. Manual dispatch still requires
+review of the environment claim and intended ref. See
+[workflow instructions](.github/workflows/AGENTS.md).
+
 For docs-only PRs, comment only when docs claim a grade, safety property,
 permission boundary, release state, or output format that is not supported by
 the reviewed code or workflows.
 
-## Next Recommended Move
+## Delivery
 
-Use this context plus the README and supporting docs to resume the next active task, then promote the repo beyond minimum-viable by capturing a dedicated handoff, roadmap, or discovery artifact.
-
-<!-- portfolio-context:end -->
+Keep changes small and scoped; preserve unrelated work. Report actual commands
+and results, and distinguish local verification from CI, publishing, and human
+acceptance. `make build` creates local distributions; publishing is separate and
+must follow [the release checklist](docs/RELEASE.md). Keep generated reports,
+coverage data, and distributions out of commits.

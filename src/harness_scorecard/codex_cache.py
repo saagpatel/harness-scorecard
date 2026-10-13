@@ -117,9 +117,7 @@ def _parse_breakpoint(item: dict[str, Any]) -> tuple[bool, str | None, list[str]
     issues: list[str] = []
     extra = sorted(key for key in raw if key != "mode")
     if extra:
-        issues.append(
-            "prompt_cache_breakpoint has undocumented fields: " + ", ".join(extra)
-        )
+        issues.append("prompt_cache_breakpoint has undocumented fields: " + ", ".join(extra))
     mode = raw.get("mode")
     if not isinstance(mode, str):
         issues.append("prompt_cache_breakpoint.mode is missing or not a string")
@@ -127,9 +125,7 @@ def _parse_breakpoint(item: dict[str, Any]) -> tuple[bool, str | None, list[str]
     return True, mode, issues
 
 
-def _parse_content_item(
-    item: Any, role: str | None, issues: list[str]
-) -> CodexCacheBlock | None:
+def _parse_content_item(item: Any, role: str | None, issues: list[str]) -> CodexCacheBlock | None:
     if not isinstance(item, dict):
         issues.append("input content item is not an object")
         return None
