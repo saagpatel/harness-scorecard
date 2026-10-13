@@ -60,10 +60,10 @@ class TestD2EgressMonitoring(unittest.TestCase):
 
 
 class TestD3ToolSurface(unittest.TestCase):
-    def test_strong_passes_both(self) -> None:
+    def test_strong_has_partial_tool_and_inbound_coverage(self) -> None:
         config = load_codex_harness(FIXTURES / "codex_strong")
-        self.assertEqual(get_check("CDX-D3-01").run(config).status, Status.PASS)
-        self.assertEqual(get_check("CDX-D3-02").run(config).status, Status.PASS)
+        self.assertEqual(get_check("CDX-D3-01").run(config).status, Status.PARTIAL)
+        self.assertEqual(get_check("CDX-D3-02").run(config).status, Status.PARTIAL)
 
     def test_no_hooks_fails_both(self) -> None:
         config = make_codex_config(hooks=[])
@@ -74,20 +74,53 @@ class TestD3ToolSurface(unittest.TestCase):
         config = make_codex_config(hooks=[HookEntry("PermissionRequest", "", "hooks/approve.py")])
         self.assertEqual(get_check("CDX-D3-01").run(config).status, Status.PASS)
 
+    def test_narrow_tool_guard_is_partial(self) -> None:
+        config = make_codex_config(hooks=[HookEntry("PreToolUse", "Bash", "hooks/guard.py")])
+        self.assertEqual(get_check("CDX-D3-01").run(config).status, Status.PARTIAL)
+
+    def test_empty_or_async_guard_does_not_count(self) -> None:
+        config = make_codex_config(
+            hooks=[
+                HookEntry("PreToolUse", "", "  "),
+                HookEntry("PreToolUse", "", "hooks/async.py", async_hook=True),
+            ]
+        )
+        self.assertEqual(get_check("CDX-D3-01").run(config).status, Status.FAIL)
+
     def test_sanitizing_user_prompt_submit_defends_injection(self) -> None:
         config = make_codex_config(
             hooks=[HookEntry("UserPromptSubmit", "", "hooks/sanitize-prompt.py")]
         )
-        self.assertEqual(get_check("CDX-D3-02").run(config).status, Status.PASS)
+        result = get_check("CDX-D3-02").run(config)
+        self.assertEqual(result.status, Status.PARTIAL)
+        self.assertIn("tool results", result.message)
 
     def test_bare_user_prompt_submit_audit_hook_is_not_injection_defense(self) -> None:
         # A UserPromptSubmit audit logger does not screen for injection -> no false PASS.
         config = make_codex_config(hooks=[HookEntry("UserPromptSubmit", "", "hooks/log-prompt.py")])
         self.assertEqual(get_check("CDX-D3-02").run(config).status, Status.FAIL)
 
-    def test_sanitization_pretooluse_hook_defends_injection(self) -> None:
+    def test_tool_result_sanitization_is_partial_without_prompt_screening(self) -> None:
         config = make_codex_config(
-            hooks=[HookEntry("PreToolUse", "Bash", "hooks/sanitize-content.py")]
+            hooks=[HookEntry("PostToolUse", "Bash", "hooks/sanitize-content.py")]
+        )
+        result = get_check("CDX-D3-02").run(config)
+        self.assertEqual(result.status, Status.FAIL)
+
+    def test_universal_tool_result_screening_is_partial_without_prompt_screening(self) -> None:
+        config = make_codex_config(
+            hooks=[HookEntry("PostToolUse", "*", "hooks/sanitize-content.py")]
+        )
+        result = get_check("CDX-D3-02").run(config)
+        self.assertEqual(result.status, Status.PARTIAL)
+        self.assertIn("prompts", result.message)
+
+    def test_both_inbound_lanes_are_required_for_pass(self) -> None:
+        config = make_codex_config(
+            hooks=[
+                HookEntry("UserPromptSubmit", "", "hooks/sanitize-prompt.py"),
+                HookEntry("PostToolUse", "*", "hooks/sanitize-result.py"),
+            ]
         )
         self.assertEqual(get_check("CDX-D3-02").run(config).status, Status.PASS)
 

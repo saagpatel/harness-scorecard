@@ -53,7 +53,7 @@ CASES: tuple[RedTeamCase, ...] = (
     RedTeamCase("claude-d5-unprotected-config", "HS-D5-01", Grade.C),
     RedTeamCase("codex-d1-env-secret-leak", "CDX-D1-01", Grade.D),
     RedTeamCase("codex-d4-full-access", "CDX-D4-01", Grade.C, gate_is_sole_cause=False),
-    RedTeamCase("codex-d5-self-mutable", "CDX-D5-01", Grade.C),
+    RedTeamCase("codex-d5-self-mutable", "CDX-D5-01", Grade.C, gate_is_sole_cause=False),
 )
 
 

@@ -7,7 +7,7 @@ prompt-injection before it steers the agent (a UserPromptSubmit or content-sanit
 
 from __future__ import annotations
 
-from harness_scorecard.checks.base import Check, CheckOutcome, failed, passed
+from harness_scorecard.checks.base import Check, CheckOutcome, failed, partial, passed
 from harness_scorecard.discovery_codex import CodexConfig
 from harness_scorecard.models import Detectability, Severity
 
@@ -15,21 +15,46 @@ from harness_scorecard.models import Detectability, Severity
 # "redact" is intentionally a D1 credential needle, not an injection-screening one.
 _SANITIZE_NEEDLES = ("sanitize", "content-sentinel", "injection", "content-guard")
 # Inbound content arrives via a submitted prompt or a tool result, so screen either lane.
-_SANITIZE_EVENTS = ("UserPromptSubmit", "PreToolUse")
+_PROMPT_EVENTS = ("UserPromptSubmit",)
+_RESULT_EVENTS = ("PostToolUse",)
 
 
-def _has_sanitization_hook(config: CodexConfig) -> bool:
+def _has_screening(config: CodexConfig, events: tuple[str, ...]) -> bool:
+    if events == _RESULT_EVENTS:
+        return any(
+            hook.event == "PostToolUse"
+            and not hook.async_hook
+            and hook.matcher.strip() in ("", "*")
+            and any(needle in hook.command for needle in _SANITIZE_NEEDLES)
+            for hook in config.hooks
+        )
     return any(
-        config.has_hook(event, needle) for event in _SANITIZE_EVENTS for needle in _SANITIZE_NEEDLES
+        hook.event == event
+        and not hook.async_hook
+        and any(needle in hook.command for needle in _SANITIZE_NEEDLES)
+        for event in events
+        for hook in config.hooks
     )
 
 
 def _tool_call_gating(config: CodexConfig) -> CheckOutcome:
-    events = [e for e in ("PreToolUse", "PermissionRequest") if config.has_event(e)]
-    if events:
+    hooks = [
+        hook
+        for hook in config.hooks
+        if hook.event in ("PreToolUse", "PermissionRequest")
+        and not hook.async_hook
+        and hook.command.strip()
+    ]
+    universal = [hook for hook in hooks if hook.matcher.strip() in ("", "*")]
+    if universal:
         # A registered hook on these lanes intercepts every matching tool call before it runs;
         # whether its policy blocks is its own (statically opaque) logic.
-        return passed("A hook intercepts tool calls before they run.", evidence=events)
+        return passed("A valid universal hook intercepts tool calls before they run.")
+    if hooks:
+        return partial(
+            "Tool-call hooks cover only selected tools; universal coverage is not established.",
+            evidence=[f"matcher: {hook.matcher or '(empty)'}" for hook in hooks],
+        )
     return failed(
         "No PreToolUse or PermissionRequest hook intercepts tool calls; the agent's tool surface "
         "is ungoverned.",
@@ -37,13 +62,18 @@ def _tool_call_gating(config: CodexConfig) -> CheckOutcome:
 
 
 def _injection_defense(config: CodexConfig) -> CheckOutcome:
-    if _has_sanitization_hook(config):
-        return passed(
-            "A content-sanitization hook screens inbound prompts/tool output for injection."
+    prompt = _has_screening(config, _PROMPT_EVENTS)
+    results = _has_screening(config, _RESULT_EVENTS)
+    if prompt and results:
+        return passed("Prompt screening and tool-result screening both cover inbound injection.")
+    if prompt or results:
+        covered = "prompts" if prompt else "tool results"
+        missing = "tool results" if prompt else "prompts"
+        return partial(
+            f"Inbound screening covers {covered}, but {missing} are not screened for injection."
         )
     return failed(
-        "No content-sanitization hook (on UserPromptSubmit or PreToolUse) defends against prompt "
-        "injection in inbound content.",
+        "Neither prompts nor tool results have content-sanitization screening for injection.",
     )
 
 
