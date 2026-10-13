@@ -52,8 +52,18 @@ def _codex_home_writable(config: CodexConfig) -> bool:
     return False
 
 
+def _self_protect_coverage(config: CodexConfig) -> set[str]:
+    return {
+        tool
+        for tool in ("Bash", "Edit", "Write")
+        if any(
+            config.has_hook("PreToolUse", needle, matcher=tool) for needle in _SELF_PROTECT_NEEDLES
+        )
+    }
+
+
 def _has_self_protect_hook(config: CodexConfig) -> bool:
-    return any(config.has_hook("PreToolUse", needle) for needle in _SELF_PROTECT_NEEDLES)
+    return _self_protect_coverage(config) == {"Bash", "Edit", "Write"}
 
 
 def _self_mutation_floor(config: CodexConfig) -> CheckOutcome:
@@ -62,6 +72,7 @@ def _self_mutation_floor(config: CodexConfig) -> CheckOutcome:
         config.sandbox_recognized and not config.sandbox_disabled and not home_writable
     )
     has_guard = _has_self_protect_hook(config)
+    guard_coverage = _self_protect_coverage(config)
     if sandbox_protects or has_guard:
         sources = []
         if sandbox_protects:
@@ -69,6 +80,11 @@ def _self_mutation_floor(config: CodexConfig) -> CheckOutcome:
         if has_guard:
             sources.append("hook:self-protect")
         return passed("The agent cannot rewrite its own harness config.", sources)
+    if guard_coverage:
+        return partial(
+            "The self-protection hook covers only some config-write routes.",
+            evidence=[f"covered: {', '.join(sorted(guard_coverage))}"],
+        )
     if not config.sandbox_recognized and not home_writable:
         return unknown(f"Cannot confirm harness protection: sandbox_mode={config.sandbox_mode!r}.")
     return failed(
@@ -87,7 +103,12 @@ def _agents_md_present(config: CodexConfig) -> CheckOutcome:
 
 def _self_protect_hook(config: CodexConfig) -> CheckOutcome:
     if _has_self_protect_hook(config):
-        return passed("A PreToolUse hook guards writes to the harness configuration.")
+        return passed("A PreToolUse hook covers Bash, Edit, and Write config mutations.")
+    if _self_protect_coverage(config):
+        return partial(
+            "A PreToolUse hook guards only some config-write routes.",
+            evidence=[f"covered: {', '.join(sorted(_self_protect_coverage(config)))}"],
+        )
     return failed("No hook guards writes to ~/.codex config, hooks, or AGENTS.md.")
 
 
@@ -102,10 +123,16 @@ def _check_stated_guarantees(config: CodexConfig) -> CheckOutcome:
     backed = [f for f in hard if f.status in ENFORCED_STATUSES]
     prose_only = [f for f in hard if f.status is ClaimStatus.PROSE_ONLY]
     pending = [f for f in hard if f.status is ClaimStatus.CANDIDATE_LOGIC]
-    if not prose_only and not pending:
+    unresolved = [f for f in hard if f.status is ClaimStatus.UNKNOWN]
+    if not prose_only and not pending and not unresolved:
         return passed(
             f"All {len(hard)} stated hard guarantees have enforcement backing under {report.mode}.",
             evidence=[f"{f.claim.source}: {f.status.value}" for f in hard],
+        )
+    if not backed and not prose_only and unresolved:
+        return unknown(
+            f"Cannot resolve enforcement for {len(unresolved)} stated hard guarantees.",
+            [f"{f.claim.source}: unknown effective sandbox/profile" for f in unresolved],
         )
     if not backed and prose_only:
         return failed(
@@ -117,9 +144,11 @@ def _check_stated_guarantees(config: CodexConfig) -> CheckOutcome:
     evidence.extend(
         f"{f.claim.source}: logic-guard candidate, needs manual review" for f in pending
     )
+    evidence.extend(f"{f.claim.source}: enforcement unknown" for f in unresolved)
     return partial(
         f"{len(backed)}/{len(hard)} stated hard guarantees are backed; "
-        f"{len(prose_only)} prose-only, {len(pending)} pending manual review.",
+        f"{len(prose_only)} prose-only, {len(pending)} pending manual review, "
+        f"{len(unresolved)} unknown.",
         evidence=evidence,
     )
 

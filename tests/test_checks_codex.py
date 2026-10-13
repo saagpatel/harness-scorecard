@@ -174,7 +174,7 @@ class TestD5SelfProtection(unittest.TestCase):
             sandbox_mode="danger-full-access",
             hooks=[HookEntry("PreToolUse", "Bash", "hooks/self-protect.py")],
         )
-        self.assertEqual(get_check("CDX-D5-01").run(config).status, Status.PASS)
+        self.assertEqual(get_check("CDX-D5-01").run(config).status, Status.PARTIAL)
 
     def test_writable_root_over_codex_home_defeats_sandbox(self) -> None:
         config = make_codex_config(

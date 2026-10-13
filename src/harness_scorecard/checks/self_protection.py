@@ -13,6 +13,7 @@ from harness_scorecard.checks.base import (
     not_applicable,
     partial,
     passed,
+    unknown,
 )
 from harness_scorecard.claims import ENFORCED_STATUSES, ClaimStatus, audit_claims
 from harness_scorecard.discovery import HarnessConfig
@@ -20,14 +21,17 @@ from harness_scorecard.models import Detectability, Grade, Severity
 
 
 def _has_write_protection(config: HarnessConfig) -> bool:
-    # The config-write vector is guarded only if BOTH the Edit and Write tools are covered
-    # by a file guard, OR a dedicated Bash write guard is present. A file guard that covers
-    # just one of Edit/Write leaves the other tool able to mutate the config.
-    files_cover_both = config.has_hook(
-        "PreToolUse", "protect-files", matcher="Edit"
-    ) and config.has_hook("PreToolUse", "protect-files", matcher="Write")
-    bash_write_guard = config.has_hook("PreToolUse", "protect-claude-writes", matcher="Bash")
-    return files_cover_both or bash_write_guard
+    return _write_coverage(config) == {"Bash", "Edit", "Write"}
+
+
+def _write_coverage(config: HarnessConfig) -> set[str]:
+    coverage: set[str] = set()
+    for tool in ("Bash", "Edit", "Write"):
+        if config.has_hook("PreToolUse", "protect-claude-writes", matcher=tool) or config.has_hook(
+            "PreToolUse", "protect-files", matcher=tool
+        ):
+            coverage.add(tool)
+    return coverage
 
 
 def _has_read_protection(config: HarnessConfig) -> bool:
@@ -42,9 +46,18 @@ def _check_config_write_protected(config: HarnessConfig) -> CheckOutcome:
             "Harness config is protected on both the write and read paths.",
             evidence=["write-path guard present", "read-path guard present"],
         )
-    if has_write or has_read:
+    if has_write and has_read:
+        coverage = ", ".join(sorted(_write_coverage(config)))
+        return passed(
+            "Harness config is protected on both the write and read paths.",
+            evidence=[f"write routes covered: {coverage}", "read-path guard present"],
+        )
+    if has_write or has_read or _write_coverage(config):
         covered = "write-path" if has_write else "read-path"
         missing = "read-path" if has_write else "write-path"
+        if _write_coverage(config) and not has_write:
+            missing_tools = sorted({"Bash", "Edit", "Write"} - _write_coverage(config))
+            missing = "write routes " + ", ".join(missing_tools)
         return partial(
             f"Only the {covered} guard protects the harness config; {missing} is unguarded.",
             evidence=[f"{missing} guard missing (parity gap)"],
@@ -106,11 +119,17 @@ def _check_stated_guarantees(config: HarnessConfig) -> CheckOutcome:
     backed = [f for f in hard if f.status in ENFORCED_STATUSES]
     prose_only = [f for f in hard if f.status is ClaimStatus.PROSE_ONLY]
     pending = [f for f in hard if f.status is ClaimStatus.CANDIDATE_LOGIC]
-    if not prose_only and not pending:
+    unresolved = [f for f in hard if f.status is ClaimStatus.UNKNOWN]
+    if not prose_only and not pending and not unresolved:
         return passed(
             f"All {len(hard)} stated hard guarantees have enforcement backing under "
             f"mode {config.default_mode}.",
             evidence=[f"{f.claim.source}: {f.status.value}" for f in hard],
+        )
+    if not backed and not prose_only and unresolved:
+        return unknown(
+            f"Cannot resolve enforcement for {len(unresolved)} stated hard guarantees.",
+            [f"{f.claim.source}: unknown effective sandbox/profile" for f in unresolved],
         )
     if not backed and prose_only:
         return failed(
@@ -122,9 +141,11 @@ def _check_stated_guarantees(config: HarnessConfig) -> CheckOutcome:
     evidence.extend(
         f"{f.claim.source}: logic-guard candidate, needs manual review" for f in pending
     )
+    evidence.extend(f"{f.claim.source}: enforcement unknown" for f in unresolved)
     return partial(
         f"{len(backed)}/{len(hard)} stated hard guarantees are backed; "
-        f"{len(prose_only)} prose-only, {len(pending)} pending manual review.",
+        f"{len(prose_only)} prose-only, {len(pending)} pending manual review, "
+        f"{len(unresolved)} unknown.",
         evidence=evidence,
     )
 
