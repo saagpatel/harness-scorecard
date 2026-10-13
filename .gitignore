@@ -8,3 +8,8 @@ wheels/
 
 # Virtual environments
 .venv
+
+# Local check artifacts
+.coverage
+htmlcov/
+.ruff_cache/
