@@ -17,12 +17,25 @@ _CORE_SECRET_PATHS: tuple[tuple[str, tuple[str, ...]], ...] = (
     (".env files", (".env",)),
 )
 
+_CORE_SECRET_LOCATIONS = {
+    "~/.ssh": "~/.ssh",
+    "~/.aws": "~/.aws",
+    "~/.gnupg": "~/.gnupg",
+    "1Password/op": "~/.config/op",
+    "gcloud": "~/.config/gcloud",
+    ".env files": "**/.env*",
+}
+
+
+def _path_for(label: str) -> str:
+    return _CORE_SECRET_LOCATIONS[label]
+
 
 def _check_sensitive_paths_denied(config: HarnessConfig) -> CheckOutcome:
     covered: list[str] = []
     missing: list[str] = []
-    for label, needles in _CORE_SECRET_PATHS:
-        if config.deny_matches(*needles):
+    for label, _needles in _CORE_SECRET_PATHS:
+        if config.deny_covers_path("Read", _path_for(label)):
             covered.append(label)
         else:
             missing.append(label)
@@ -61,7 +74,7 @@ def _check_write_time_secret_scan(config: HarnessConfig) -> CheckOutcome:
 
 
 def _check_token_store_protected(config: HarnessConfig) -> CheckOutcome:
-    if config.deny_matches(".tokens", ".state", ".credentials"):
+    if config.deny_matches(".tokens", ".state", ".credentials", tool="Read"):
         return passed("The harness's own token/state store is read-protected.")
     return failed("The harness token/state store is not denied; approval tokens are forgeable.")
 
@@ -77,7 +90,7 @@ def _check_telemetry_disabled(config: HarnessConfig) -> CheckOutcome:
 
 
 def _check_wallet_protected(config: HarnessConfig) -> CheckOutcome:
-    if config.deny_matches("metamask", "phantom", "wallet", "keystore"):
+    if config.deny_matches("metamask", "phantom", "wallet", "keystore", tool="Read"):
         return passed("Crypto-wallet keystore paths are denied for read.")
     return failed("Browser-extension wallet storage is not denied for read.")
 

@@ -151,7 +151,7 @@ def effective_block(
     sources: list[str] = [
         f"hook:{hook_name}" for hook_name in hooks if config.has_hook(event, hook_name, matcher)
     ]
-    if any(config.deny_matches(needle) for needle in deny_needles):
+    if any(config.deny_matches(needle, tool="Bash") for needle in deny_needles):
         sources.append("permissions.deny")
     if hard_deny_covers(config, hard_deny_tokens):
         sources.append("hard_deny")

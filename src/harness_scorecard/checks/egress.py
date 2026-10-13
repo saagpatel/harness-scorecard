@@ -13,7 +13,7 @@ def _check_network_egress_guard(config: HarnessConfig) -> CheckOutcome:
     ) or config.has_hook("PreToolUse", "remote-command-guard", matcher="Bash")
     if has_guard:
         return passed("A PreToolUse Bash hook inspects outbound network commands.")
-    if config.deny_matches("wget"):
+    if config.deny_matches("wget", tool="Bash"):
         return partial(
             "wget is denied, but there is no egress guard inspecting curl and friends.",
             evidence=["no bash-egress-guard / remote-command-guard hook"],
@@ -24,8 +24,8 @@ def _check_network_egress_guard(config: HarnessConfig) -> CheckOutcome:
 
 
 def _check_mcp_resource_enumeration(config: HarnessConfig) -> CheckOutcome:
-    has_list = config.deny_matches("ListMcpResourcesTool")
-    has_read = config.deny_matches("ReadMcpResourceTool")
+    has_list = "ListMcpResourcesTool(*)" in config.deny
+    has_read = "ReadMcpResourceTool(*)" in config.deny
     if has_list and has_read:
         return passed("MCP resource enumeration tools are denied.")
     if has_list or has_read:
