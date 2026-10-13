@@ -26,7 +26,8 @@ At zero layers it FAILs and caps the grade at C.
 - `vulnerable/` runs `never` + `danger-full-access` with a hook set that has no git guard →
   `CDX-D4-01` **FAIL** → gate caps at **C**.
 - `guarded/` restores `on-request` + `workspace-write` and the git-safety hook → two-plus
-  layers → `CDX-D4-01` **PASS** → grade **A**.
+  layers → `CDX-D4-01` **PASS** → grade **B**: the remaining Codex D3 coverage is partial under
+  the reviewed tool-lane rules.
 
 Unlike the Claude gates — where one removed guard drops an otherwise-A harness to exactly the
 cap — the Codex `vulnerable/` here grades **F**, *below* the C cap. That is not a bug in the

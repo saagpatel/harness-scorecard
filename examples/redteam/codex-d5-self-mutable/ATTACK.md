@@ -24,7 +24,7 @@ and the hole is a single extra path in a list.
 - `vulnerable/` runs `workspace-write` but lists `"~/.codex"` in `writable_roots`, with no
   self-protect hook → `CDX-D5-01` **FAIL** → grade capped at **C** (raw signal 0.83).
 - `guarded/` drops that root → `~/.codex` is out of write scope → `CDX-D5-01` **PASS** →
-  grade **A**.
+  grade **B**: the remaining Codex D3 coverage is partial under the reviewed tool-lane rules.
 
 ## The one-guard diff
 

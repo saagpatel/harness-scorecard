@@ -6,6 +6,37 @@ All notable changes to Harness Scorecard are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- **HS-D1-01 parses tool-scoped deny rules and verifies path coverage.** Credential paths only
+  count when a `Read(...)` argument pattern covers the intended files; destructive-command deny
+  rules are matched only within the corresponding tool arguments.
+- **Disabled hooks no longer count as controls.** Claude Code `disableAllHooks` and Codex hook
+  disable settings are applied before checks, claims auditing, and dispatcher introspection.
+- **Async hooks no longer satisfy blocking checks.** Flattened hook entries retain execution
+  metadata, and async PreToolUse/PermissionRequest hooks are excluded from blocking evidence.
+- **CDX-D5-01 and HS-D5-01 require every config-write route.** Hook protection must cover Bash,
+  Edit, and Write; incomplete coverage is PARTIAL.
+- **Codex `default_permissions` profiles are resolved before `sandbox_mode`.** Built-in profiles
+  use their documented boundaries, including `:danger-full-access`; unresolved profiles make
+  sandbox-dependent checks UNKNOWN.
+- **Claims require a blocking hook on the relevant tool lane.** Stop-only or other non-blocking
+  hooks no longer appear as `enforced_hook` backing for hard-deny claims.
+- **Unknown Codex sandbox values no longer imply protection.** Egress, secret-write, recovery,
+  network, and claims results return UNKNOWN when their effective sandbox cannot be resolved.
+- **CDX-D3-01 requires a valid universal guard for PASS.** A narrow tool matcher earns PARTIAL.
+- **CDX-D3-02 checks prompts and tool results independently.** PASS requires both screening
+  paths, and PARTIAL names the uncovered path.
+- **`fleet` exits 2 when a requested target cannot be graded.** It still prints the graded
+  targets and per-target errors in the partial report.
+- **Saved report loading validates nested structure and numeric values.** Malformed reports now
+  raise `ValueError` and the `diff` command exits 2.
+- **README and rubric coverage statements match current discovery.** The deleted Codex
+  routing-facts monitor is no longer linked, and Codex sandbox profile precedence is documented.
+
+Rubric version: **1.9.0**. Existing PASS conditions materially tightened; no checks, weights,
+or package version were added or changed.
+
 ### Added
 
 - **`diff` warns when the rubric version differs.** Comparing reports graded against

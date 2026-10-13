@@ -201,6 +201,7 @@ Harness Scorecard  fleet  (2 harnesses)
 Pass any paths or globs (`fleet ~/.claude ~/Projects/*/.claude`); each harness is graded with
 its own auto-discovered policy. `--min-grade` (default `B`) exits non-zero if **any** harness is
 below the bar — drop it in CI to keep a whole team's harnesses above a floor.
+If any requested path cannot be graded, `fleet` still prints the partial report and exits `2`.
 
 ### Audit your own stated guarantees
 
@@ -434,7 +435,3 @@ an HTML report with the fixture scan plus `--html /path/to/scratch/scorecard.htm
 changed content, readability, and layout; browser review is conditional on report
 changes, not required for pure documentation changes. Keep generated reports out
 of commits.
-
-Codex routing assumptions have a separate read-only
-[schema and model-catalog drift monitor](docs/codex-routing-facts.md). Its live result is
-maintainer evidence only and never changes the static grade.

@@ -1,4 +1,4 @@
-# Harness Scorecard Rubric (v1.8.0)
+# Harness Scorecard Rubric (v1.9.0)
 
 > The rubric **is** the product. It encodes real, documented red-team findings from
 > operating mature coding-agent harnesses into a set of statically-checkable signals,
@@ -19,7 +19,7 @@ harness rooted at a `.claude/`-style directory:
 |---|---|---|
 | Permission floor | `settings.json` / `settings.local.json` → `permissions.{allow,deny,defaultMode}` | The hard allow/deny lists and the enforcement mode |
 | Declared hard limits | `settings.json` → `autoMode.hard_deny` | Non-negotiable rules — **only effective when `defaultMode != bypassPermissions`** |
-| Active guards | `settings.json` → `hooks` (+ the `hooks/` directory) | The PreToolUse/PostToolUse/lifecycle scripts that actually enforce at runtime |
+| Active guards | `settings.json` → `hooks` (+ the `hooks/` directory), unless `disableAllHooks` is true | The effective PreToolUse/PostToolUse/lifecycle scripts |
 | Behavioral contract | `CLAUDE.md`, `rules/*.md` | Documented operating rules (advisory unless a hook enforces them) |
 | Delegation surface | `agents/*.md` | Subagent definitions; reviewer/validator coverage |
 | Capability surface | `skills/`, `skill-rules.json` | Installed skills and their provenance/injection surface |
@@ -92,6 +92,8 @@ exit 2 with an error. Absent files retain defaults; optional Codex profile/proje
 TOML layers retain UNKNOWN caveats. Unrecognized approval and sandbox values cannot
 supply protective layers for CDX-D4-01 / CDX-D5-01; insufficient known protection is
 UNKNOWN unless a known exposure already establishes FAIL.
+Hooks disabled by Codex's feature setting are excluded from checks, claims, and dispatcher
+introspection.
 
 Hook tool lanes use case-sensitive regex search consistently. Empty and `*` matchers
 are universal; invalid regexes match nothing. Regex search is not implicitly anchored.
@@ -168,7 +170,7 @@ harness shows in config. *Failure mode* = the documented incident it guards agai
   `**/.env*`. PASS = all core paths; PARTIAL = some; FAIL = none.
   Failure mode: agent (or an injected instruction) reads private keys / cloud creds and exfiltrates.
   Proof: [`examples/redteam/claude-d1-credential-exposure`](../examples/redteam/claude-d1-credential-exposure/ATTACK.md).
-  Known gap: the scorer currently matches substrings in any deny entry; Read-tool and glob coverage are not yet verified.
+  Deny rules are parsed into a tool and argument; PASS requires Read globs that match sample files throughout every listed credential location.
 - **HS-D1-02 — Sensitive-read Bash backstop (3, STATIC)**
   Signal: a PreToolUse `Bash` hook that re-blocks sensitive-file reads, so a crafted
   `cat ~/.ssh/id_rsa` can't slip past tool-level denies. Failure mode: deny lists only
@@ -235,7 +237,8 @@ harness shows in config. *Failure mode* = the documented incident it guards agai
 
 - **HS-D5-01 — Harness config write-protected (5, STATIC) [GATE→C]**: read-path **and**
   write-path guards both protect the harness's own `hooks/`, `agents/`, `settings*.json`,
-  `skills/*`. FM: injection mutates the guard layer itself.
+  `skills/*`; write protection must cover Bash, Edit, and Write routes. Incomplete route coverage
+  is PARTIAL. FM: injection mutates the guard layer itself.
   Proof: [`examples/redteam/claude-d5-unprotected-config`](../examples/redteam/claude-d5-unprotected-config/ATTACK.md).
 - **HS-D5-02 — Hook integrity verify + self-heal (4, STATIC)**: SessionStart integrity
   verification and self-heal. FM: a hook is silently edited/disabled, weakening the floor.
@@ -304,18 +307,19 @@ harness runs its own check suite (`HS-*` vs `CDX-*`) over the shared engine.
 
 | Surface | File / key | What it tells the scorer |
 |---|---|---|
-| Filesystem sandbox | `config.toml` → `sandbox_mode` | `read-only` / `workspace-write` / `danger-full-access` — the core write/exec guardrail |
+| Filesystem sandbox | `config.toml` → `default_permissions` or legacy `sandbox_mode` | Built-in `:read-only`, `:workspace`, and `:danger-full-access` profiles take precedence over `sandbox_mode`; unresolved custom profiles are UNKNOWN |
 | Network | `config.toml` → `[sandbox_workspace_write].network_access`, `web_search` | Outbound egress channels |
 | Human gate | `config.toml` → `approval_policy` | `untrusted` / `on-failure` / `on-request` / `never` — when a command needs approval |
 | Trust | `config.toml` → `[projects."…"].trust_level` | Directories where approval is suppressed |
 | Env hygiene | `config.toml` → `[shell_environment_policy]` | Whether secret-named env vars reach subprocesses |
-| Active guards | `hooks.json` → `SessionStart`/`UserPromptSubmit`/`PreToolUse`/`PermissionRequest`/`PostToolUse`/`Stop` | Lifecycle scripts (same schema as Claude Code) |
+| Active guards | `hooks.json` → lifecycle events, unless `features.codex_hooks = false` or `hooks_enabled = false` | Effective lifecycle scripts (same schema as Claude Code) |
 | Delegation | `config.toml` → `[agents]` (`max_threads`, `max_depth`, per-role `approval_policy`, `config_file`) | Subagent fan-out and governance |
 | Behavioral contract | `AGENTS.md` / `AGENTS.override.md` | Documented operating rules |
 | History | `config.toml` → `[history].persistence`, `notify` | Audit trail and turn signalling |
 
 **The effective-floor analog (§3, for Codex):** Claude Code's `bypassPermissions` makes
-`hard_deny` inert; Codex's equivalent is **`sandbox_mode = "danger-full-access"` (sandbox inert)
+`hard_deny` inert; Codex's equivalent is **`default_permissions = ":danger-full-access"`** (or
+legacy `sandbox_mode = "danger-full-access"`; sandbox inert)
 combined with `approval_policy = "never"` (no human gate)**. When both hold, destructive and
 exfiltrating actions run unchecked, and the gated checks compute against what remains (hooks
 only). A `[projects."…"].trust_level = "trusted"` likewise lowers the floor by suppressing
@@ -323,6 +327,10 @@ approval inside that directory.
 
 CLI flags, `--config`, `--profile` selection, and in-session `/model` or `/reasoning` changes
 cannot be reconstructed from static files and are not part of this rubric's grade.
+
+The built-in `default_permissions` profiles resolve to the corresponding sandbox boundary. A
+custom profile that static discovery cannot resolve makes sandbox-dependent checks UNKNOWN;
+the legacy `sandbox_mode` is not used as a fallback when a profile is selected.
 
 **Codex gates** (same caps as Claude Code):
 
@@ -354,10 +362,13 @@ cannot be reconstructed from static files and are not part of this rubric's grad
   blocked alone is PARTIAL). FM: no defense in depth if the sandbox is misconfigured.
 
 **D3 — Tool-surface & injection (weight 4).**
-- **CDX-D3-01 — Tool calls intercepted (2, STATIC)**: a `PreToolUse`/`PermissionRequest` hook
-  intercepts every tool call (its policy is opaque to static analysis). FM: ungoverned surface.
-- **CDX-D3-02 — Inbound content screened (2, STATIC)**: a sanitization hook on
-  `UserPromptSubmit`/`PreToolUse`. FM: prompt injection via user prompt or tool output.
+- **CDX-D3-01 — Tool calls intercepted (2, STATIC)**: a valid non-empty `PreToolUse` or
+  `PermissionRequest` hook with a universal matcher earns PASS; selected tool coverage is
+  PARTIAL. Its policy is opaque to static analysis. FM: ungoverned surface.
+- **CDX-D3-02 — Inbound content screened (2, STATIC)**: both prompt screening
+  (`UserPromptSubmit`) and universal blocking tool-result screening (`PostToolUse`) earn PASS;
+  one side is PARTIAL and the finding names the missing side. FM: prompt injection via user prompt
+  or tool output.
 
 **D4 — Destructive / git (weight 5, GATE).**
 - **CDX-D4-01 — Effective gate on destructive actions (3, STATIC) [GATE→C]**: at least two of
@@ -380,8 +391,9 @@ cannot be reconstructed from static files and are not part of this rubric's grad
 
 **D5 — Self-protection (weight 5, GATE).**
 - **CDX-D5-01 — Agent cannot mutate its own harness (3, STATIC) [GATE→C]**: `~/.codex` is out
-  of write scope (sandbox not `danger`, not in `writable_roots`) or a self-protect hook guards
-  it. FM: injection rewrites the guard layer itself.
+  of write scope (sandbox not `danger`, not in `writable_roots`) or a self-protect hook covers
+  Bash, Edit, and Write. Partial tool coverage is PARTIAL. FM: injection rewrites the guard layer
+  itself.
   Proof: [`examples/redteam/codex-d5-self-mutable`](../examples/redteam/codex-d5-self-mutable/ATTACK.md).
 - **CDX-D5-02 — Operating contract declared (1, STATIC)**: `AGENTS.md` present.
 - **CDX-D5-03 — Self-protection hook (1, STATIC)**: a hook guards writes to the harness config.
@@ -439,9 +451,12 @@ unredacted source text and paths. Scans do not send data off the machine.
 The rubric is versioned (`RUBRIC_VERSION`) and emitted in every report so a grade is
 reproducible against a known rubric. Adding/retiring checks, or changing which checks count
 toward the grade, bumps the version. Current
-rubric: **1.8.0**. Check IDs (`HS-Dn-nn` / `CDX-Dn-nn`) are stable and never reused.
+rubric: **1.9.0**. Check IDs (`HS-Dn-nn` / `CDX-Dn-nn`) are stable and never reused.
 
 Retired check IDs: `HS-D10-03`, `CDX-D7-03`, `CDX-D7-04`, and `CDX-D7-05` remain reserved.
+
+Rubric 1.9.0 tightens existing PASS conditions for effective deny matching, hook eligibility,
+Codex profiles, and coverage-sensitive checks. No checks or weights were added.
 
 Rubric 1.8.0 removes private machine-specific checks without changing other weights or dimensions.
 Rubric 1.7.1 corrects false guard credits without new checks or weights: unknown
