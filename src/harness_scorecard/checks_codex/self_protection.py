@@ -18,6 +18,7 @@ from harness_scorecard.checks.base import (
     not_applicable,
     partial,
     passed,
+    unknown,
 )
 from harness_scorecard.claims import ENFORCED_STATUSES, ClaimStatus, audit_claims
 from harness_scorecard.discovery_codex import CodexConfig
@@ -56,7 +57,10 @@ def _has_self_protect_hook(config: CodexConfig) -> bool:
 
 
 def _self_mutation_floor(config: CodexConfig) -> CheckOutcome:
-    sandbox_protects = not config.sandbox_disabled and not _codex_home_writable(config)
+    home_writable = _codex_home_writable(config)
+    sandbox_protects = (
+        config.sandbox_recognized and not config.sandbox_disabled and not home_writable
+    )
     has_guard = _has_self_protect_hook(config)
     if sandbox_protects or has_guard:
         sources = []
@@ -65,6 +69,8 @@ def _self_mutation_floor(config: CodexConfig) -> CheckOutcome:
         if has_guard:
             sources.append("hook:self-protect")
         return passed("The agent cannot rewrite its own harness config.", sources)
+    if not config.sandbox_recognized and not home_writable:
+        return unknown(f"Cannot confirm harness protection: sandbox_mode={config.sandbox_mode!r}.")
     return failed(
         "The harness is mutable by the agent: danger-full-access (or a writable_root covering "
         "~/.codex) with no self-protection hook.",
