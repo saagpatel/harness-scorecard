@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import json
-from typing import Any
+import math
+from typing import Any, NoReturn
 
 from harness_scorecard.checks import DIMENSIONS
 from harness_scorecard.failure_modes import FAILURE_MODES
@@ -25,6 +26,11 @@ _STATUS_TAG = {
     Status.UNKNOWN: "UNKN",
     Status.NOT_APPLICABLE: "N/A ",
 }
+
+
+def _raise_malformed_report(detail: str) -> NoReturn:
+    msg = f"malformed harness-scorecard JSON report: {detail}"
+    raise ValueError(msg)
 
 
 def _pending_dimension_ids(card: Scorecard) -> list[str]:
@@ -215,6 +221,23 @@ def _detectability_from_dict(value: str) -> Detectability:
 
 
 def _check_from_dict(data: dict[str, Any], dimension_id: str) -> CheckResult:
+    if not isinstance(data, dict):
+        _raise_malformed_report("check must be an object")
+    _require_integer(data.get("weight"), "check.weight", minimum=1)
+    for key in ("id", "title", "status"):
+        if not isinstance(data.get(key), str):
+            _raise_malformed_report(f"check.{key} must be a string")
+    for key in ("message", "remediation", "waiver_reason", "credit_source"):
+        if key in data and not isinstance(data[key], str):
+            _raise_malformed_report(f"check.{key} must be a string")
+    for key in ("is_gate", "waived", "dispatcher_credited"):
+        if key in data and not isinstance(data[key], bool):
+            _raise_malformed_report(f"{key} must be boolean")
+    if "evidence" in data and (
+        not isinstance(data["evidence"], list)
+        or any(not isinstance(item, str) for item in data["evidence"])
+    ):
+        _raise_malformed_report("evidence must be a string list")
     gate_cap = data.get("gate_cap")
     return CheckResult(
         id=data["id"],
@@ -249,16 +272,19 @@ def from_dict(data: dict[str, Any]) -> Scorecard:
         msg = "not a harness-scorecard JSON report (missing 'dimensions'/'grade')"
         raise ValueError(msg)
     try:
-        dimensions = [
-            DimensionResult(
-                id=dim["id"],
-                name=dim["name"],
-                weight=dim["weight"],
-                score=dim["score"],
-                checks=[_check_from_dict(c, dim["id"]) for c in dim["checks"]],
-            )
-            for dim in data["dimensions"]
-        ]
+        _require_number(data.get("overall_score"), "overall_score", minimum=0, maximum=1)
+        for key in ("harness_path", "harness_type", "rubric_version"):
+            if not isinstance(data.get(key), str):
+                _raise_malformed_report(f"{key} must be a string")
+        for key in ("caveats", "policy_notes"):
+            if key in data and (
+                not isinstance(data[key], list)
+                or any(not isinstance(item, str) for item in data[key])
+            ):
+                _raise_malformed_report(f"{key} must be a string list")
+        if not isinstance(data["dimensions"], list):
+            _raise_malformed_report("dimensions must be a list")
+        dimensions = [_dimension_from_dict(dim) for dim in data["dimensions"]]
         gate_caps = [
             c for dim in dimensions for c in dim.checks if c.triggered_gate_cap is not None
         ]
@@ -273,6 +299,49 @@ def from_dict(data: dict[str, Any]) -> Scorecard:
             caveats=[str(caveat) for caveat in data.get("caveats", [])],
             policy_notes=[str(note) for note in data.get("policy_notes", [])],
         )
-    except (KeyError, TypeError) as exc:
+    except (KeyError, TypeError, IndexError) as exc:
         msg = f"malformed harness-scorecard JSON report: missing or invalid field {exc}"
         raise ValueError(msg) from exc
+
+
+def _require_number(
+    value: Any,
+    field_name: str,
+    *,
+    minimum: float,
+    maximum: float | None = None,
+) -> None:
+    if (
+        not isinstance(value, (int, float))
+        or isinstance(value, bool)
+        or (isinstance(value, float) and not math.isfinite(value))
+    ):
+        _raise_malformed_report(f"{field_name} must be numeric")
+    if value < minimum or (maximum is not None and value > maximum):
+        _raise_malformed_report(f"{field_name} is out of range")
+
+
+def _require_integer(value: Any, field_name: str, *, minimum: int) -> None:
+    if not isinstance(value, int) or isinstance(value, bool):
+        _raise_malformed_report(f"{field_name} must be an integer")
+    if value < minimum:
+        _raise_malformed_report(f"{field_name} is out of range")
+
+
+def _dimension_from_dict(data: Any) -> DimensionResult:
+    if not isinstance(data, dict):
+        _raise_malformed_report("dimension must be an object")
+    _require_number(data.get("score"), "dimension.score", minimum=0, maximum=1)
+    _require_integer(data.get("weight"), "dimension.weight", minimum=1)
+    if not isinstance(data.get("checks"), list):
+        _raise_malformed_report("checks must be a list")
+    for key in ("id", "name"):
+        if not isinstance(data.get(key), str):
+            _raise_malformed_report(f"dimension.{key} must be a string")
+    return DimensionResult(
+        id=data["id"],
+        name=data["name"],
+        weight=data["weight"],
+        score=data["score"],
+        checks=[_check_from_dict(check, data["id"]) for check in data["checks"]],
+    )
