@@ -392,7 +392,7 @@ Fix the false passes above with regression tests, then split the publish workflo
 
 ## Development
 
-Use **uv 0.12.12** from the repository root. `.python-version` pins managed
+Use **uv 0.13.0** from the repository root. `.python-version` pins managed
 **Python 3.14.7** for development; the package keeps its **Python >=3.12** floor.
 With that uv version on `PATH`, a fresh clone reaches the full local gate with:
 
@@ -408,7 +408,7 @@ the aggregate gate used by CI: lock freshness, Ruff format and lint checks,
 is **92.33%**, with a **90.33%** floor. Dev tools are pinned to the existing lock:
 Ruff 0.15.20, ty 0.0.55, pytest 9.1.1, and pytest-cov 7.1.0; unittest remains
 the test runner. CI covers Python 3.12, 3.13, 3.14, and 3.15 on Ubuntu with
-`fail-fast: false`; uv 0.12.12's managed 3.15.0rc2 lane is allowed to fail.
+`fail-fast: false`.
 
 For focused verification:
 

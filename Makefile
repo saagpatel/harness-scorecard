@@ -19,6 +19,6 @@ build: require-uv
 
 require-uv:
 	@command -v uv >/dev/null 2>&1 || { \
-		printf '%s\n' 'Install uv 0.12.12, add it to PATH, then run make setup.' >&2; \
+		printf '%s\n' 'Install uv 0.13.0, add it to PATH, then run make setup.' >&2; \
 		exit 1; \
 	}

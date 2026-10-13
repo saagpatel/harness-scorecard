@@ -19,17 +19,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - python: "3.12"
-            experimental: false
-          - python: "3.13"
-            experimental: false
-          - python: "3.14"
-            experimental: false
-          # uv 0.12.12 offers 3.15.0rc2 as a managed download.
-          - python: "3.15"
-            experimental: true
-    continue-on-error: ${{ matrix.experimental }}
+        python: ["3.12", "3.13", "3.14", "3.15"]
     env:
       UV_PYTHON: ${{ matrix.python }}
       UV_MANAGED_PYTHON: "1"
@@ -40,7 +30,7 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
         with:
-          version: "0.12.12"
+          version: "0.13.0"
 
       - name: Set up Python
         run: uv python install "${{ matrix.python }}"

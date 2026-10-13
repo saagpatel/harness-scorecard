@@ -53,7 +53,7 @@ lint = ["ruff==0.15.20", "ty==0.0.55"]
 test = ["pytest==9.1.1", "pytest-cov==7.1.0"]
 
 [tool.uv]
-required-version = "==0.12.12"
+required-version = "==0.13.0"
 
 [tool.coverage.run]
 branch = true

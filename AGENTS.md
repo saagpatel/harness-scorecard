@@ -13,7 +13,7 @@ and Codex harnesses. The runtime is Python stdlib-only, with a Python 3.12 floor
 
 ## Setup
 
-Use uv 0.12.12; `.python-version` pins managed Python 3.14.7 for development.
+Use uv 0.13.0; `.python-version` pins managed Python 3.14.7 for development.
 From the repository root, run `make setup` to install locked dependencies.
 Never refresh the lockfile just to verify a change.
 
@@ -21,8 +21,7 @@ Never refresh the lockfile just to verify a change.
 
 Run `make check` for lock freshness, formatting, lint, source-only types, and
 the unittest suite with branch coverage (90.33% minimum). `make test` runs only
-the coverage tests. CI covers Python 3.12–3.15; the managed 3.15 prerelease lane
-is allowed to fail. Keep tests on unittest and type-check only `src/`.
+the coverage tests. CI covers Python 3.12–3.15, all required. Keep tests on unittest and type-check only `src/`.
 
 For a safe CLI smoke, run:
 
