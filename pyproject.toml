@@ -46,13 +46,23 @@ harness-scorecard = "harness_scorecard.cli:main"
 requires = ["uv_build>=0.11.13,<0.12.0"]
 build-backend = "uv_build"
 
-# Dev tooling is declared here but installed via an approval-gated `uv add`.
-# Tests run on the stdlib (`unittest`) until pytest is approved; the suite is
-# written as unittest.TestCase classes so pytest discovers it unchanged.
+# Tests use unittest; pytest-cov supplies the locked coverage tool.
 [dependency-groups]
 dev = [{ include-group = "lint" }, { include-group = "test" }]
-lint = ["ruff", "ty"]
-test = ["pytest", "pytest-cov"]
+lint = ["ruff==0.15.20", "ty==0.0.55"]
+test = ["pytest==9.1.1", "pytest-cov==7.1.0"]
+
+[tool.uv]
+required-version = "==0.12.12"
+
+[tool.coverage.run]
+branch = true
+source = ["harness_scorecard"]
+
+[tool.coverage.report]
+precision = 2
+# Baseline: 92.33% with branch coverage on Python 3.14.7.
+fail_under = 90.33
 
 [tool.ruff]
 line-length = 100

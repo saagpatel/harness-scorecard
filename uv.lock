@@ -105,18 +105,18 @@ test = [
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "pytest" },
-    { name = "pytest-cov" },
-    { name = "ruff" },
-    { name = "ty" },
+    { name = "pytest", specifier = "==9.1.1" },
+    { name = "pytest-cov", specifier = "==7.1.0" },
+    { name = "ruff", specifier = "==0.15.20" },
+    { name = "ty", specifier = "==0.0.55" },
 ]
 lint = [
-    { name = "ruff" },
-    { name = "ty" },
+    { name = "ruff", specifier = "==0.15.20" },
+    { name = "ty", specifier = "==0.0.55" },
 ]
 test = [
-    { name = "pytest" },
-    { name = "pytest-cov" },
+    { name = "pytest", specifier = "==9.1.1" },
+    { name = "pytest-cov", specifier = "==7.1.0" },
 ]
 
 [[package]]
