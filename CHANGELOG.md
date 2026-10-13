@@ -30,6 +30,35 @@ All notable changes to Harness Scorecard are documented here. The format follows
 
 ### Fixed
 
+- **Action crashes and interrupts fail enforcement.** Only scan exit 0 (and diff
+  exit 0 when a baseline is set) succeeds; unexpected codes now emit an error
+  instead of claiming the minimum grade was met. Existing 0/1/2 messages stay
+  unchanged. SARIF upload is limited to scan codes 0 and 1.
+- **Invalid harness files no longer grade as empty.** Unreadable, undecodable,
+  malformed, or non-object JSON configuration and invalid base `config.toml`
+  now report an input error (exit 2). Absent files retain defaults and optional
+  Codex profile/project TOML layers retain uncertainty caveats. Non-list hook
+  group fields are skipped without crashing.
+- **Unknown Codex modes cannot supply protective layers** to CDX-D4-01 or
+  CDX-D5-01. Insufficient known protection becomes UNKNOWN unless a known
+  exposure already establishes FAIL; UNKNOWN is excluded from the denominator.
+- **Hook lanes consistently use case-sensitive regex search.** Unrelated names
+  such as `NotebookEdit`, lowercase tool names, and invalid regexes no longer
+  receive substring credit. Empty and `*` matchers remain universal.
+- **HS-D9-01 requires declared provenance for PASS.** A Write+Edit gate also
+  needs a provenance rule filename or `skill-provenance` hook command. A gate
+  without that declaration is PARTIAL; provenance is declared, not verified.
+- **Report writes fail with exit 2 before stdout.** JSON, HTML, SARIF, badge,
+  and claims JSON reports use same-directory temporary files and atomic
+  replacement. Summary output stays append-only with the same error handling.
+  Multiple output files are not a transaction; earlier replacements may remain
+  if a later replacement or summary append fails.
+- **Publishing credentials are isolated from checks and builds.** The `build`
+  job runs `make check` and uploads distributions with `contents: read`; only
+  the dependent `publish` job uses the `pypi` environment and `id-token: write`.
+- **Rubric 1.7.1** records these correctness fixes in JSON, console, HTML, and
+  SARIF. Package version and locked dependencies are unchanged.
+
 - **RUNTIME checks are no longer graded.** The rubric (§2) says RUNTIME signals are surfaced
   as information and never folded into the grade, but `HS-D10-03` (peer-agent branch receipt
   discipline) was scored like any other check. RUNTIME checks are now excluded from dimension

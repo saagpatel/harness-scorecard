@@ -15,7 +15,7 @@ with no way to tell if theirs is any good. The rubric is the product: every chec
 ```text
 $ harness-scorecard scan examples/sample-harness
 
-Harness Scorecard  v1.7.0
+Harness Scorecard  v1.7.1
 Target: examples/sample-harness   (claude-code)
 
   GRADE:  F        overall 0.28 / 1.00
@@ -134,7 +134,7 @@ harness-scorecard scan ~/.claude --sarif harness.sarif --min-grade C
 ```
 
 `--min-grade {A,B,C,D,F}` sets the bar (default `B`). Exit codes: `0` meets the bar ·
-`1` below the bar · `2` invalid input (including no harness found).
+`1` below the bar · `2` invalid input or report-write failure (including no harness found).
 
 ### Explain a finding
 
@@ -380,15 +380,13 @@ Version 1.13.1 is published on PyPI and maintained. CI tests Python 3.12 through
 
 Python 3.12+ (developed on 3.14) with uv, ruff, ty, and unittest under coverage. Ships a CLI and a composite GitHub Action.
 
-### Known risks
+### Known limits
 
-- The Action treats an unexpected scan exit code, such as a crash, as success.
-- Unreadable or malformed harness configuration is read as empty, which can under-report findings.
-- Hook matching uses substring rules in one path and regex in another, so equivalent rules can score differently.
-
-### Next steps
-
-Fix the false passes above with regression tests, then split the publish workflow so only the upload step holds `id-token: write`.
+Static findings credit configured signals; they do not verify runtime enforcement.
+Unknown Codex modes cannot supply protective sources for CDX-D4-01 / CDX-D5-01;
+other sandbox consumers still require a separate follow-up. Skill provenance is
+credited as declared, not verified. Report replacement is atomic per file;
+multiple outputs and append-only summaries are not a transaction.
 
 ## Development
 

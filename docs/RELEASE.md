@@ -22,7 +22,7 @@ This repo publishes two surfaces:
    <https://pypi.org/manage/project/harness-scorecard/settings/publishing/>
 
 4. Create the exact release tag, for example `v1.13.0`.
-5. Wait for the `Publish` GitHub Actions workflow to pass.
+5. Wait for both `build` and `publish` jobs in the `Publish` workflow to pass.
 6. Verify the PyPI release page and JSON API show the new version and both artifacts.
 7. Move the `v1` major tag to the same commit as the exact release tag. The
    publish workflow is intentionally filtered to exact semver tags
@@ -45,9 +45,12 @@ The failure output prints useful claims:
 - `environment`
 - `ref`
 
-For this repo, `publish.yml` intentionally sets the `pypi` GitHub Actions
-environment so manual and tag-triggered publishes pass through the same release
-gate before the job receives `id-token: write`. PyPI trusted publishing must be
+The `build` job in `publish.yml` runs setup, the full check gate, the self-scan,
+and the distribution build with only `contents: read`. It uploads a one-day
+artifact. The `publish` job depends on `build`, downloads that artifact without
+checkout or shell commands, and uploads it to PyPI with only `id-token: write`.
+Only `publish` sets the `pypi` GitHub Actions environment so manual and tag-triggered
+publishes pass through the same release gate before the job receives `id-token: write`. PyPI trusted publishing must be
 configured with that same `pypi` environment claim.
 
 ## Post-Release Readback
