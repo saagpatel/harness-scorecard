@@ -372,6 +372,24 @@ adapter and check suite over the shared scoring engine; the bypass-aware effecti
 to Codex's `sandbox_mode = "danger-full-access"` + `approval_policy = "never"` just as it does
 to Claude Code's `bypassPermissions`. The rubric is versioned and emitted in every report.
 
+## Status
+
+Version 1.13.1 is published on PyPI and maintained. CI tests Python 3.12 through 3.15.
+
+### Stack
+
+Python 3.12+ (developed on 3.14) with uv, ruff, ty, and unittest under coverage. Ships a CLI and a composite GitHub Action.
+
+### Known risks
+
+- The Action treats an unexpected scan exit code, such as a crash, as success.
+- Unreadable or malformed harness configuration is read as empty, which can under-report findings.
+- Hook matching uses substring rules in one path and regex in another, so equivalent rules can score differently.
+
+### Next steps
+
+Fix the false passes above with regression tests, then split the publish workflow so only the upload step holds `id-token: write`.
+
 ## Development
 
 Use **uv 0.12.12** from the repository root. `.python-version` pins managed
