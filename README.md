@@ -391,7 +391,7 @@ multiple outputs and append-only summaries are not a transaction.
 
 ## Development
 
-Use **uv 0.13.0** from the repository root. `.python-version` pins managed
+Use **uv 0.13.9 or any later 0.13.x** from the repository root. `.python-version` pins managed
 **Python 3.14.7** for development; the package keeps its **Python >=3.12** floor.
 With that uv version on `PATH`, a fresh clone reaches the full local gate with:
 
