@@ -13,7 +13,7 @@ and Codex harnesses. The runtime is Python stdlib-only, with a Python 3.12 floor
 
 ## Setup
 
-Use uv 0.13.0; `.python-version` pins managed Python 3.14.7 for development.
+Use uv 0.13.9 or any later 0.13.x; `.python-version` pins managed Python 3.14.7 for development.
 From the repository root, run `make setup` to install locked dependencies.
 Never refresh the lockfile just to verify a change.
 
