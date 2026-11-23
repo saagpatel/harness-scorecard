@@ -29,7 +29,7 @@ Both `vulnerable/` and `guarded/` run `bypassPermissions` and carry the *same*
 `hard_deny` block listing "Push to main or master". The difference is one hook:
 
 - `vulnerable/` has **no** PreToolUse `Bash` `git-safety` hook → the effective floor is empty
-  → `HS-D4-01` **FAIL** → grade capped at **C** (raw signal 0.94).
+  → `HS-D4-01` **FAIL** → grade capped at **C** (raw signal 0.92).
 - `guarded/` adds the hook → the floor blocks the push → `HS-D4-01` **PASS** → grade **A**.
 
 The hard_deny block is identical in both. The scorer never credits it under bypass — proving
