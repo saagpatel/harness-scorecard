@@ -21,7 +21,7 @@ This is an env-hygiene problem the sandbox can't fix — the sandbox bounds wher
 ## What the scorecard sees
 
 - `vulnerable/` sets `ignore_default_excludes = true` → secrets are exposed to every
-  subprocess → `CDX-D1-01` **FAIL** → grade capped at **D** (raw signal 0.86).
+  subprocess → `CDX-D1-01` **FAIL** → the gate lowers the raw **C** (0.78) to **D**.
 - `guarded/` leaves it `false` (the default) → secrets scrubbed → `CDX-D1-01` **PASS** →
   grade **B**: the remaining Codex D3 coverage is partial under the reviewed tool-lane rules.
 

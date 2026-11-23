@@ -306,7 +306,7 @@ harness runs its own check suite (`HS-*` vs `CDX-*`) over the shared engine.
 |---|---|---|
 | Filesystem sandbox | `config.toml` → `default_permissions` or legacy `sandbox_mode` | Built-in `:read-only`, `:workspace`, and `:danger-full-access` profiles take precedence over `sandbox_mode`; unresolved custom profiles are UNKNOWN |
 | Network | `config.toml` → `[sandbox_workspace_write].network_access`, `web_search` | Outbound egress channels |
-| Human gate | `config.toml` → `approval_policy` | Recognizes `untrusted`, `on-failure`, `on-request`, `never`, and `granular` policies |
+| Human gate | `config.toml` → `approval_policy` | Discovery recognizes `untrusted`, `on-failure`, `on-request`, `never`, and `granular` for the effective-floor check (`CDX-D4-01`). The approval check (`CDX-D4-03`) gives `granular` PARTIAL without evaluating its individual settings. |
 | Trust | `config.toml` → `[projects."…"].trust_level` | Directories where approval is suppressed |
 | Env hygiene | `config.toml` → `[shell_environment_policy]` | Whether secret-named env vars reach subprocesses |
 | Active guards | `hooks.json` → lifecycle events, unless `features.codex_hooks = false` or `hooks_enabled = false` | Effective lifecycle scripts (same schema as Claude Code) |

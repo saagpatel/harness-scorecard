@@ -17,7 +17,7 @@ exfiltration channel. The only thing standing between the model and your secrets
 ## What the scorecard sees
 
 The `vulnerable/` harness is otherwise excellent — telemetry off, dangerous-command hooks,
-a self-protection floor, the whole stack. It scores **0.96 on raw signal**. But its
+a self-protection floor, the whole stack. It scores **0.94 on raw signal**. But its
 `permissions.deny` is missing the six core credential globs, so `HS-D1-01` returns **FAIL**,
 and the gate **caps the grade at D** regardless of how good everything else is. That is the
 point of a gate: one unguarded credential path is not a "minus a few points" problem.

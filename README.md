@@ -293,18 +293,20 @@ See [`examples/harness-scorecard.toml`](examples/harness-scorecard.toml).
 
 Writing that manifest by hand means reading the dispatcher yourself. `scan` can do the reading: it
 looks for guard signatures in the dispatcher and its Python siblings. By default it **suggests**
-what to credit. For example:
+what to credit. This illustrative note comes from a harness where `CDX-D5-03` fails and
+the dispatcher contains a matching guard signature.
 
 ```text
   Policy notes:
-    ! CDX-D3-02: dispatcher guard evidence at user_prompt_submit_dispatch.py:5 -- verify and add to [dispatcher].credits, or re-run with --credit-detected
+    ! CDX-D5-03: dispatcher guard evidence at pre_tool_use_dispatch.py:3 -- verify and add to [dispatcher].credits, or re-run with --credit-detected
 ```
 
-Pass `--credit-detected` to apply those finds as PARTIAL credits, labeled `(dispatcher-detected)`
-to keep them distinct from a hand-verified `(dispatcher-credited)` manifest entry:
+To apply a suggestion, replace the path below with your harness directory. For an unwaived,
+failing non-gate check, `--credit-detected` raises the result to PARTIAL and labels it
+`(dispatcher-detected)`. A manual manifest credit is labeled `(dispatcher-credited)`.
 
 ```bash
-harness-scorecard scan tests/fixtures/codex_strong --credit-detected
+harness-scorecard scan path/to/harness-with-dispatcher --credit-detected
 ```
 
 A source match is *evidence, not proof*, so detection stays conservative: suggest-only by default,
