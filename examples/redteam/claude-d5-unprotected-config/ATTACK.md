@@ -26,7 +26,7 @@ when neither is present.
 
 - `vulnerable/` removed the `protect-files` (Read/Edit/Write) and `protect-claude-writes`
   (Bash) hooks → no read-path *and* no write-path guard → `HS-D5-01` **FAIL** → grade capped
-  at **C** (raw signal 0.94).
+  at **C** (raw signal 0.92).
 - `guarded/` keeps them → both paths covered → `HS-D5-01` **PASS** → grade **A**.
 
 ## The one-guard diff

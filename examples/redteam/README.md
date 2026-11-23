@@ -26,11 +26,10 @@ is. Each pair isolates one gate:
 | [`codex-d4-full-access`](codex-d4-full-access/ATTACK.md) | Codex | `CDX-D4-01` | **C** | the effective floor (sandbox + approval + git hook) |
 | [`codex-d5-self-mutable`](codex-d5-self-mutable/ATTACK.md) | Codex | `CDX-D5-01` | **C** | keeping `~/.codex` out of `writable_roots` |
 
-For five of the six, the `vulnerable/` harness scores in the **A or B band on raw signal** and is
-dragged down to the cap by the single failing gate — the cleanest possible demonstration that
-the gate, not general weakness, is what bit. The sixth (`codex-d4`) grades **F** because
-Codex's bypass knobs are load-bearing across D1/D4/D5 at once; its `ATTACK.md` explains why,
-and the gate still fires.
+In four pairs, a single gate lowers the vulnerable harness's grade below its raw band:
+all three Claude Code harnesses start in the A band, and `codex-d1` starts in C and is
+capped at D. The other vulnerable harnesses already score at or below their C cap on raw
+signal: `codex-d4` grades F and `codex-d5` grades C.
 
 ## See it yourself
 

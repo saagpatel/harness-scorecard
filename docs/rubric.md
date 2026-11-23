@@ -77,20 +77,17 @@ Each check returns one of:
 | `PASS` | 1.0 | Configured guard signal credited |
 | `PARTIAL` | 0.5 | Partial credit returned by the check; detectability is separate |
 | `FAIL` | 0.0 | Guard absent or inert |
-| `UNKNOWN` | — | Material state exists but static evidence cannot resolve it; visible in every output and excluded from the denominator |
+| `UNKNOWN` | — | Static evidence is inconclusive. Excluded from the scoring denominator. |
 | `NOT_APPLICABLE` | — | Excluded from the denominator (e.g., Codex-only check on a CC harness) |
 
-`UNKNOWN` is not partial credit and not a pass. It is used for unresolved runtime-selected
-models, invocation overrides, stale or unsupported model/effort pairs, contradictory config
-surfaces, and other cases where assigning a numeric value would overstate what static evidence
-proves. JSON emits `"status": "unknown"`; console/HTML/summary render it explicitly; SARIF emits
-an informational `note`. Badges and exit codes continue to reflect the scored grade only.
+`UNKNOWN` is used, for example, when a check depends on a Codex sandbox profile that the
+scorer cannot resolve. JSON emits `"status": "unknown"`. Console, HTML, and summary reports
+show unresolved findings, and SARIF emits an informational `note`. A badge shows the letter grade.
 
 Malformed or unreadable base harness files (`settings.json`, `settings.local.json`,
 `hooks.json`, `config.toml`) are invalid input, not an empty harness: CLI scans return
-exit 2 with an error. Absent files retain defaults; optional Codex profile/project
-TOML layers retain UNKNOWN caveats. Unrecognized approval and sandbox values cannot
-supply protective layers for CDX-D4-01 / CDX-D5-01; insufficient known protection is
+exit 2 with an error. Absent optional files retain defaults. Unrecognized approval and sandbox
+values cannot supply protective layers for CDX-D4-01 / CDX-D5-01; insufficient known protection is
 UNKNOWN unless a known exposure already establishes FAIL.
 Hooks disabled by Codex's feature setting are excluded from checks, claims, and dispatcher
 introspection.
@@ -300,7 +297,7 @@ The ten dimensions, the scoring math, the gates, and the A–F bands are **ident
 Codex. Only the *evidence* differs: Codex governs the agent through a filesystem **sandbox**, a
 human **approval policy**, per-project **trust levels**, MCP servers, and a `hooks.json` whose
 schema matches Claude Code's — not a permission mode plus deny globs. The harness type is
-auto-detected (Claude Code → `settings.json`; Codex → `config.toml` / `AGENTS.md`) and each
+auto-detected (Claude Code → `settings.json` / `settings.local.json`; Codex → `config.toml` / `AGENTS.md`) and each
 harness runs its own check suite (`HS-*` vs `CDX-*`) over the shared engine.
 
 **Codex surface:**
@@ -309,18 +306,18 @@ harness runs its own check suite (`HS-*` vs `CDX-*`) over the shared engine.
 |---|---|---|
 | Filesystem sandbox | `config.toml` → `default_permissions` or legacy `sandbox_mode` | Built-in `:read-only`, `:workspace`, and `:danger-full-access` profiles take precedence over `sandbox_mode`; unresolved custom profiles are UNKNOWN |
 | Network | `config.toml` → `[sandbox_workspace_write].network_access`, `web_search` | Outbound egress channels |
-| Human gate | `config.toml` → `approval_policy` | `untrusted` / `on-failure` / `on-request` / `never` — when a command needs approval |
+| Human gate | `config.toml` → `approval_policy` | Discovery recognizes `untrusted`, `on-failure`, `on-request`, `never`, and `granular` for the effective-floor check (`CDX-D4-01`). The approval check (`CDX-D4-03`) gives `granular` PARTIAL without evaluating its individual settings. |
 | Trust | `config.toml` → `[projects."…"].trust_level` | Directories where approval is suppressed |
 | Env hygiene | `config.toml` → `[shell_environment_policy]` | Whether secret-named env vars reach subprocesses |
 | Active guards | `hooks.json` → lifecycle events, unless `features.codex_hooks = false` or `hooks_enabled = false` | Effective lifecycle scripts (same schema as Claude Code) |
 | Delegation | `config.toml` → `[agents]` (`max_threads`, `max_depth`, per-role `approval_policy`, `config_file`) | Subagent fan-out and governance |
-| Behavioral contract | `AGENTS.md` / `AGENTS.override.md` | Documented operating rules |
+| Behavioral contract | `AGENTS.md` and inventoried `agents/*.toml` files | Sources of stated guarantees for the claims audit |
 | History | `config.toml` → `[history].persistence`, `notify` | Audit trail and turn signalling |
 
 **The effective-floor analog (§3, for Codex):** Claude Code's `bypassPermissions` makes
 `hard_deny` inert; Codex's equivalent is **`default_permissions = ":danger-full-access"`** (or
 legacy `sandbox_mode = "danger-full-access"`; sandbox inert)
-combined with `approval_policy = "never"` (no human gate)**. When both hold, destructive and
+combined with `approval_policy = "never"` (no human gate). When both hold, destructive and
 exfiltrating actions run unchecked, and the gated checks compute against what remains (hooks
 only). A `[projects."…"].trust_level = "trusted"` likewise lowers the floor by suppressing
 approval inside that directory.
@@ -435,8 +432,8 @@ surface offers.
 > of static grading — explicit, conventionally-named guards grade higher because they are
 > auditable. The grader **surfaces this in the report itself**: when it detects a dispatcher idiom
 > (`dispatch`, `router`, `run-hooks`, …) on a tool-gating event in either harness, it emits a
-> **caveat** in every output format so a low score on the affected checks reads as "not statically
-> visible," not "insecure." The caveat reframes the grade; it never changes it.
+> **caveat** in console, JSON, HTML, SARIF, and summary scorecards. The caveat explains
+> where static evidence is limited and leaves the grade unchanged.
 
 ## 7. Privacy & redaction
 
@@ -448,8 +445,8 @@ unredacted source text and paths. Scans do not send data off the machine.
 
 ## 8. Rubric versioning
 
-The rubric is versioned (`RUBRIC_VERSION`) and emitted in every report so a grade is
-reproducible against a known rubric. Adding/retiring checks, or changing which checks count
+Console, JSON, HTML, SARIF, and summary scorecards include the rubric version (`RUBRIC_VERSION`).
+Adding/retiring checks, or changing which checks count
 toward the grade, bumps the version. Current
 rubric: **1.9.0**. Check IDs (`HS-Dn-nn` / `CDX-Dn-nn`) are stable and never reused.
 
